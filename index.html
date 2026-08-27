@@ -373,10 +373,10 @@
       <h1>Stock, Sales &amp; Production</h1>
       <div class="subtitle">Consolidated view of <span id="hdr-total-skus">–</span> SKUs — stock cover, open demand and active production orders.</div>
       <div class="sources">
-        <span class="source-tag">Plytix · catalogue<span class="src-updated">Updated about 2 days ago</span></span>
-        <span class="source-tag">Inventory Export · stock<span class="src-updated">Updated about 1 day ago</span></span>
-        <span class="source-tag">Open SO Report · sales orders<span class="src-updated">Updated about 1 minute ago</span></span>
-        <span class="source-tag">Work Order Report · production<span class="src-updated">Updated about 1 minute ago</span></span>
+        <span class="source-tag">Plytix · catalogue<span class="src-updated" data-timestamp="2026-08-25T14:13:27Z">Updated —</span></span>
+        <span class="source-tag">Inventory Export · stock<span class="src-updated" data-timestamp="2026-08-26T11:06:48Z">Updated —</span></span>
+        <span class="source-tag">Open SO Report · sales orders<span class="src-updated" data-timestamp="2026-08-27T12:15:32Z">Updated —</span></span>
+        <span class="source-tag">Work Order Report · production<span class="src-updated" data-timestamp="2026-08-27T12:15:33Z">Updated —</span></span>
         <span class="source-tag pending">Monthly Sales · pending<span class="src-updated">Not yet provided</span></span>
       </div>
     </div>
@@ -677,6 +677,32 @@ let selectedSkus = new Set();
 function esc(s){
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+// ---------- Live "updated X ago" counters ----------
+function relativeTimeFrom(isoString){
+  const then = new Date(isoString);
+  if(isNaN(then.getTime())) return null;
+  const now = new Date();
+  const seconds = Math.max(0, Math.floor((now - then) / 1000));
+  if(seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if(minutes < 60) return `about ${minutes} minute${minutes===1?'':'s'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if(hours < 24) return `about ${hours} hour${hours===1?'':'s'} ago`;
+  const days = Math.floor(hours / 24);
+  return `about ${days} day${days===1?'':'s'} ago`;
+}
+function updateSourceTimestamps(){
+  document.querySelectorAll('.src-updated[data-timestamp]').forEach(el=>{
+    const ts = el.dataset.timestamp;
+    if(!ts) return;
+    const rel = relativeTimeFrom(ts);
+    el.textContent = rel ? `Updated ${rel}` : 'Updated —';
+  });
+}
+updateSourceTimestamps();
+setInterval(updateSourceTimestamps, 30000); // refresh every 30s so the counter visibly ticks up
+
 function createWoButtonHtml(d){
   const hasOpenWo = d.Open_WO_Count > 0;
   return hasOpenWo ? '' : `<button class="create-wo-btn" data-action="createwo" data-sku="${d.SKU}">Create Work Order</button>`;
