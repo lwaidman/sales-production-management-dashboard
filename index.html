@@ -70,6 +70,9 @@
   .source-tag .src-updated{ font-size: 9.5px; color: var(--text-faint); font-weight:400; }
   .source-tag.pending{ color: var(--prod); border-color: rgba(245,185,77,0.3); }
   .source-tag.pending .src-updated{ color: rgba(245,185,77,0.7); }
+  .src-updated.fresh{ color: #6fae8c; }
+  .src-updated.medium{ color: #b39a63; }
+  .src-updated.stale{ color: #b17878; }
 
   /* ---------- TOP NAV ---------- */
   .top-nav{ display:flex; gap:8px; margin-bottom: 24px; }
@@ -134,6 +137,12 @@
   .tab-btn.active.risk-tab{ background: var(--risk); border-color: var(--risk); }
   .tab-btn.active.prod-tab{ background: var(--prod); border-color: var(--prod); }
   .tab-btn.active.parked-tab{ background: var(--parked); border-color: var(--parked); }
+  .dismiss-covered-btn{
+    font-family: var(--sans); font-size: 12.5px; font-weight:600; color: var(--ok);
+    background: rgba(53,214,138,0.08); border: 1px solid rgba(53,214,138,0.35); padding: 8px 14px; border-radius: 7px;
+    cursor:pointer; margin-left: auto; transition: all .15s; display:inline-flex; align-items:center;
+  }
+  .dismiss-covered-btn:hover{ background: rgba(53,214,138,0.16); }
 
   /* ---------- TABLE ---------- */
   table{ width:100%; border-collapse: collapse; font-size: 14.5px; line-height: 1.5; table-layout: auto; }
@@ -401,6 +410,7 @@
         <span class="source-tag">Inventory Export · stock<span class="src-updated" data-timestamp="2026-08-28T12:00:34Z">Updated —</span></span>
         <span class="source-tag">Open SO Report · sales orders<span class="src-updated" data-timestamp="2026-08-28T12:00:34Z">Updated —</span></span>
         <span class="source-tag">Work Order Report · production<span class="src-updated" data-timestamp="2026-08-28T12:00:34Z">Updated —</span></span>
+        <span class="source-tag">Open PO Report · purchases<span class="src-updated" data-timestamp="2026-08-28T12:00:54Z">Updated —</span></span>
         <span class="source-tag pending">Monthly Sales · pending<span class="src-updated">Not yet provided</span></span>
       </div>
     </div>
@@ -505,6 +515,7 @@
       <button class="tab-btn risk-tab active" data-tab="risk">🔴 Stockout risk</button>
       <button class="tab-btn prod-tab" data-tab="prod">🟡 In production</button>
       <button class="tab-btn parked-tab" data-tab="parked">⚪ Idle stock</button>
+      <button class="dismiss-covered-btn" id="dismissCoveredBtn" style="display:none;"></button>
     </div>
     <div style="overflow-x:auto;">
       <table id="priorityTable">
@@ -739,6 +750,7 @@ const SUMMARY = JSON.parse(document.getElementById('summary-data').textContent);
 const PLANNING_DATA = JSON.parse(document.getElementById('planning-data').textContent);
 const PRODUCTION_LINES = JSON.parse(document.getElementById('production-lines-data').textContent);
 const SUPPLY_COVERAGE = JSON.parse(document.getElementById('supply-coverage-data').textContent);
+const SUPPLY_BY_SKU = Object.fromEntries(SUPPLY_COVERAGE.map(r=>[r.SKU, r]));
 const BY_SKU = Object.fromEntries(SKU_DATA.map(d=>[d.SKU, d]));
 let selectedSkus = new Set();
 function esc(s){
@@ -759,12 +771,23 @@ function relativeTimeFrom(isoString){
   const days = Math.floor(hours / 24);
   return `about ${days} day${days===1?'':'s'} ago`;
 }
+function freshnessClass(isoString){
+  const then = new Date(isoString);
+  if(isNaN(then.getTime())) return '';
+  const hours = (new Date() - then) / 3600000;
+  if(hours < 5) return 'fresh';
+  if(hours < 12) return 'medium';
+  return 'stale';
+}
 function updateSourceTimestamps(){
   document.querySelectorAll('.src-updated[data-timestamp]').forEach(el=>{
     const ts = el.dataset.timestamp;
     if(!ts) return;
     const rel = relativeTimeFrom(ts);
     el.textContent = rel ? `Updated ${rel}` : 'Updated —';
+    el.classList.remove('fresh','medium','stale');
+    const cls = freshnessClass(ts);
+    if(cls) el.classList.add(cls);
   });
 }
 updateSourceTimestamps();
@@ -1121,15 +1144,20 @@ function renderPriority(tab){
   const sortKey = tab==='risk'?'Open_SO_Qty':(tab==='prod'?'Open_WO_Qty':'Available');
   const rows = topBy(tab, sortKey);
   const showWO = tab==='prod';
+  const showSupply = tab==='risk';
   const headRow = document.getElementById('priorityHeadRow');
   headRow.innerHTML = `
     <th><input type="checkbox" class="select-all-check"></th>
     <th>SKU</th><th>Description</th><th>Category</th>
     <th class="num">Available</th><th class="num">Open orders</th>
     <th class="num">In production</th><th class="num">Net position</th>
-    ${showWO ? '<th>Production order</th>' : ''}<th></th>`;
+    ${showWO ? '<th>Production order</th>' : ''}
+    ${showSupply ? '<th>Supply coverage</th>' : ''}<th></th>`;
   const body = document.getElementById('priorityBody');
-  body.innerHTML = rows.map(d=>`
+  body.innerHTML = rows.map(d=>{
+    const cov = SUPPLY_BY_SKU[d.SKU];
+    const covMeta = cov ? (VERDICT_META[cov.Verdict] || {label:cov.Verdict, cls:'none'}) : null;
+    return `
     <tr>
       <td><input type="checkbox" class="row-check" data-sku="${d.SKU}" ${selectedSkus.has(d.SKU)?'checked':''}></td>
       <td class="sku-code">${esc(d.SKU)}</td>
@@ -1140,11 +1168,28 @@ function renderPriority(tab){
       <td class="num">${fmt(d.Open_WO_Qty)}</td>
       <td class="num ${d.Net_Position<0?'neg':''}">${fmt(d.Net_Position)}</td>
       ${showWO ? `<td>${renderWOCell(d)}</td>` : ''}
+      ${showSupply ? `<td>${covMeta ? `<span class="verdict-badge ${covMeta.cls}">${covMeta.label}</span>` : '<span style="color:var(--text-faint);">—</span>'}</td>` : ''}
       <td>
         <button class="dismiss-btn" data-action="dismiss" data-sku="${d.SKU}">Dismiss</button>
         ${createWoButtonHtml(d)}
       </td>
-    </tr>`).join('') || `<tr><td colspan="9" style="color:var(--text-faint); text-align:center; padding:20px;">No items in this category</td></tr>`;
+    </tr>`;
+  }).join('') || `<tr><td colspan="10" style="color:var(--text-faint); text-align:center; padding:20px;">No items in this category</td></tr>`;
+
+  const covBtn = document.getElementById('dismissCoveredBtn');
+  if(covBtn){
+    if(tab === 'risk'){
+      const coveredSkus = SKU_DATA.filter(d=>statusClass(d.Status_Operacional)==='risk' && !isDismissed(d.SKU))
+        .map(d=>SUPPLY_BY_SKU[d.SKU])
+        .filter(c=>c && (c.Verdict==='covered_fg' || c.Verdict==='covered_rm'))
+        .map(c=>c.SKU);
+      covBtn.style.display = coveredSkus.length ? 'inline-flex' : 'none';
+      covBtn.textContent = `Dismiss ${coveredSkus.length} already-covered item${coveredSkus.length===1?'':'s'}`;
+      covBtn.dataset.skus = JSON.stringify(coveredSkus);
+    } else {
+      covBtn.style.display = 'none';
+    }
+  }
 }
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -1152,6 +1197,10 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.classList.add('active');
     renderPriority(btn.dataset.tab);
   });
+});
+document.getElementById('dismissCoveredBtn').addEventListener('click', function(){
+  const skus = JSON.parse(this.dataset.skus || '[]');
+  if(skus.length) openDismissModal(skus);
 });
 
 // ---------- Main filterable table ----------
