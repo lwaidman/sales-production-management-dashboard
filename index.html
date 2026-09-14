@@ -311,6 +311,8 @@
   .category-stat .val{ font-family: var(--mono); font-size: 18px; font-weight:700; }
   .category-stat .lbl{ font-size: 10.5px; color: var(--text-faint); text-transform:uppercase; letter-spacing:0.03em; }
   .chart-hint{ font-size: 10.5px; color: var(--text-faint); margin-top: 6px; }
+  .cat-chart-header{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom: 14px; flex-wrap:wrap; }
+  .cat-chart-header .dismissed-toggle{ white-space:nowrap; }
 
   /* ---------- BULK ACTION BAR ---------- */
   .bulk-bar{
@@ -524,10 +526,15 @@
   <!-- CHARTS -->
   <div class="charts-row">
     <div class="panel">
-      <div class="panel-title">Stock, demand and production by category</div>
-      <div class="panel-desc">Top categories by number of SKUs — available units vs. open sales orders vs. production orders</div>
-      <div class="chart-holder"><canvas id="catChart"></canvas></div>
-      <div class="chart-hint">Click a bar to see all SKUs in that category</div>
+      <div class="cat-chart-header">
+        <div>
+          <div class="panel-title" id="catChartTitle" style="margin-bottom:2px;">Stock, demand and production by category</div>
+          <div class="panel-desc" id="catChartDesc">Top 20 categories by number of SKUs — click any bar to drill in</div>
+        </div>
+        <button id="catChartBackBtn" class="dismissed-toggle" style="display:none;">← Back</button>
+      </div>
+      <div class="chart-holder" style="height:340px;"><canvas id="catChart"></canvas></div>
+      <div class="chart-hint" id="catChartHint">Click a bar to see all SKUs in that category</div>
     </div>
   </div>
 
@@ -579,6 +586,11 @@
         </thead>
         <tbody id="priorityBody"></tbody>
       </table>
+    </div>
+    <div class="pagination">
+      <button id="priorityPrevPage">← Previous</button>
+      <span class="page-info" id="priorityPageInfo"></span>
+      <button id="priorityNextPage">Next →</button>
     </div>
   </div>
 
@@ -665,12 +677,14 @@
           <option value="yes">Can open a work order</option>
           <option value="no">Insufficient raw material</option>
         </select>
+        <button class="dismiss-covered-btn" id="planningDismissCoveredBtn" style="display:none;"></button>
         <div class="result-count" id="planningResultCount"></div>
       </div>
       <div style="overflow-x:auto;">
         <table id="planningTable">
           <thead>
             <tr>
+              <th><input type="checkbox" class="select-all-check"></th>
               <th data-key="SKU" class="sortable-th">SKU<span class="sort-arrow"></span></th>
               <th data-key="Description" class="sortable-th">Description<span class="sort-arrow"></span></th>
               <th data-key="Category" class="sortable-th">Category<span class="sort-arrow"></span></th>
@@ -722,7 +736,13 @@
         <table id="timelineTable">
           <thead>
             <tr>
-              <th>Created</th><th>Scheduled for</th><th>SKU</th><th>Description</th><th>Category</th><th>Production order</th><th>Status</th>
+              <th data-key="created_date" class="sortable-th">Created<span class="sort-arrow"></span></th>
+              <th data-key="scheduled_date" class="sortable-th">Scheduled for<span class="sort-arrow"></span></th>
+              <th data-key="sku" class="sortable-th">SKU<span class="sort-arrow"></span></th>
+              <th data-key="description" class="sortable-th">Description<span class="sort-arrow"></span></th>
+              <th data-key="category" class="sortable-th">Category<span class="sort-arrow"></span></th>
+              <th data-key="wo_number" class="sortable-th">Production order<span class="sort-arrow"></span></th>
+              <th data-key="status" class="sortable-th">Status<span class="sort-arrow"></span></th>
             </tr>
           </thead>
           <tbody id="timelineBody"></tbody>
@@ -1034,8 +1054,9 @@ statusOrder.forEach(([key,cls])=>{
 });
 document.getElementById('statusbar-total').textContent = fmt(total)+' SKUs';
 
-// ---------- Category chart (computed dynamically) ----------
+// ---------- Category chart (dynamic drill-down: categories -> Others breakdown -> SKU level) ----------
 let topCategoryNames = [];
+const CAT_CHART_TOP_N = 20;
 function computeCategoryChartData(){
   const groups = {};
   SKU_DATA.forEach(d=>{
@@ -1047,8 +1068,8 @@ function computeCategoryChartData(){
     groups[cat].Open_WO_Qty += d.Open_WO_Qty;
   });
   const arr = Object.values(groups).sort((a,b)=>b.SKUs-a.SKUs);
-  const top = arr.slice(0,12);
-  const rest = arr.slice(12);
+  const top = arr.slice(0,CAT_CHART_TOP_N);
+  const rest = arr.slice(CAT_CHART_TOP_N);
   const others = rest.reduce((acc,c)=>{
     acc.SKUs+=c.SKUs; acc.Available+=c.Available; acc.Open_SO_Qty+=c.Open_SO_Qty; acc.Open_WO_Qty+=c.Open_WO_Qty; return acc;
   }, {Category:'Others', SKUs:0, Available:0, Open_SO_Qty:0, Open_WO_Qty:0});
@@ -1056,7 +1077,31 @@ function computeCategoryChartData(){
   topCategoryNames = top.map(c=>c.Category);
   return full;
 }
+function computeOthersBreakdown(){
+  const groups = {};
+  SKU_DATA.forEach(d=>{
+    if(topCategoryNames.includes(d.Category)) return;
+    const cat = d.Category;
+    if(!groups[cat]) groups[cat] = { Category:cat, SKUs:0, Available:0, Open_SO_Qty:0, Open_WO_Qty:0 };
+    groups[cat].SKUs++;
+    groups[cat].Available += d.Available;
+    groups[cat].Open_SO_Qty += d.Open_SO_Qty;
+    groups[cat].Open_WO_Qty += d.Open_WO_Qty;
+  });
+  return Object.values(groups).sort((a,b)=>b.SKUs-a.SKUs);
+}
+function computeSkuLevelData(category){
+  let rows;
+  if(category === '__OTHERS_SKUS__'){
+    rows = SKU_DATA.filter(d=>!topCategoryNames.includes(d.Category));
+  } else {
+    rows = SKU_DATA.filter(d=>d.Category===category);
+  }
+  return [...rows].sort((a,b)=>a.Net_Position - b.Net_Position);
+}
 
+// chartView: {mode: 'categories'|'others'|'skus', category: null|string}
+let chartView = { mode:'categories', category:null };
 let catData = computeCategoryChartData();
 const catChartInstance = new Chart(document.getElementById('catChart'), {
   type: 'bar',
@@ -1071,28 +1116,82 @@ const catChartInstance = new Chart(document.getElementById('catChart'), {
   options: {
     responsive:true, maintainAspectRatio:false,
     onClick:(evt, elements)=>{
-      if(elements.length){
-        const idx = elements[0].index;
-        const label = catChartInstance.data.labels[idx];
+      if(!elements.length) return;
+      const idx = elements[0].index;
+      const label = catChartInstance.data.labels[idx];
+      if(chartView.mode === 'categories'){
+        if(label === 'Others'){ chartView = { mode:'others', category:null }; }
+        else { chartView = { mode:'skus', category:label }; showCategoryDetail(label); }
+      } else if(chartView.mode === 'others'){
+        chartView = { mode:'skus', category:label };
         showCategoryDetail(label);
       }
+      // in 'skus' mode, clicking a bar does nothing further (already at finest grain)
+      refreshCategoryChart();
     },
     onHover:(evt, elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
     plugins:{ legend:{ position:'top', labels:{ color:'#8B95A5', font:{size:11}, boxWidth:10 } } },
     scales:{
-      x:{ ticks:{ color:'#8B95A5', font:{size:10}, maxRotation:45, minRotation:45 }, grid:{ display:false } },
-      y:{ ticks:{ color:'#8B95A5', font:{size:10}, callback:v=>v>=1000?(v/1000)+'k':v }, grid:{ color:'#262E3A' } }
+      x:{ ticks:{ color:'#8B95A5', font:{size:10}, maxRotation:60, minRotation:45, autoSkip:false }, grid:{ display:false } },
+      y:{ ticks:{ color:'#8B95A5', font:{size:10}, callback:v=>Math.abs(v)>=1000?(v/1000)+'k':v }, grid:{ color:'#262E3A' } }
     }
   }
 });
 function refreshCategoryChart(){
-  catData = computeCategoryChartData();
-  catChartInstance.data.labels = catData.map(c=>c.Category);
-  catChartInstance.data.datasets[0].data = catData.map(c=>c.Available);
-  catChartInstance.data.datasets[1].data = catData.map(c=>c.Open_SO_Qty);
-  catChartInstance.data.datasets[2].data = catData.map(c=>c.Open_WO_Qty);
+  let rows, labelKey;
+  if(chartView.mode === 'categories'){
+    rows = computeCategoryChartData();
+    labelKey = 'Category';
+  } else if(chartView.mode === 'others'){
+    rows = computeOthersBreakdown();
+    labelKey = 'Category';
+  } else {
+    rows = computeSkuLevelData(chartView.category).slice(0, 40);
+    labelKey = 'SKU';
+  }
+  catChartInstance.data.labels = rows.map(c=>c[labelKey]);
+  catChartInstance.data.datasets[0].data = rows.map(c=>c.Available);
+  catChartInstance.data.datasets[1].data = rows.map(c=>c.Open_SO_Qty);
+  catChartInstance.data.datasets[2].data = rows.map(c=>c.Open_WO_Qty);
   catChartInstance.update();
+  updateCatChartHeader(rows.length);
 }
+function updateCatChartHeader(rowCount){
+  const titleEl = document.getElementById('catChartTitle');
+  const descEl = document.getElementById('catChartDesc');
+  const hintEl = document.getElementById('catChartHint');
+  const backBtn = document.getElementById('catChartBackBtn');
+  if(chartView.mode === 'categories'){
+    titleEl.textContent = 'Stock, demand and production by category';
+    descEl.textContent = `Top ${CAT_CHART_TOP_N} categories by number of SKUs — click any bar to drill in`;
+    hintEl.textContent = 'Click a bar to see the SKUs in that category. Click "Others" to see the remaining categories individually — nothing stays hidden.';
+    backBtn.style.display = 'none';
+  } else if(chartView.mode === 'others'){
+    titleEl.textContent = `Others — ${rowCount} smaller categories`;
+    descEl.textContent = `Every category outside the top ${CAT_CHART_TOP_N}, broken out individually`;
+    hintEl.textContent = 'Click a bar to see the SKUs in that category.';
+    backBtn.style.display = 'inline-flex';
+  } else {
+    titleEl.textContent = `SKUs in ${chartView.category}`;
+    descEl.textContent = rowCount>40 ? `Showing 40 of ${rowCount} SKUs, sorted by net position (most at-risk first)` : `${rowCount} SKU${rowCount===1?'':'s'}, sorted by net position (most at-risk first)`;
+    hintEl.textContent = 'Use the table below for the full sortable, filterable list of this category.';
+    backBtn.style.display = 'inline-flex';
+  }
+}
+document.getElementById('catChartBackBtn').addEventListener('click', ()=>{
+  if(chartView.mode === 'skus' && topCategoryNames.length && !topCategoryNames.includes(chartView.category) && chartView.category !== chartView.category){
+    // unreachable safeguard
+  }
+  if(chartView.mode === 'skus'){
+    // if this category came from the "Others" breakdown, go back there; else go to top-level categories
+    const cameFromOthers = !topCategoryNames.includes(chartView.category);
+    chartView = cameFromOthers ? { mode:'others', category:null } : { mode:'categories', category:null };
+  } else {
+    chartView = { mode:'categories', category:null };
+  }
+  refreshCategoryChart();
+});
+updateCatChartHeader(catData.length);
 
 // ---------- Category detail (click-through from chart) ----------
 function skusForCategory(label){
@@ -1327,14 +1426,18 @@ function renderWOCell(d){
 }
 
 // ---------- Priority tables ----------
-function topBy(status, sortKey, n=15){
+function topBy(status, sortKey){
   return SKU_DATA.filter(d=>statusClass(d.Status_Operacional)===status && !isDismissed(d.SKU))
-    .sort((a,b)=>Math.abs(b[sortKey])-Math.abs(a[sortKey]))
-    .slice(0,n);
+    .sort((a,b)=>Math.abs(b[sortKey])-Math.abs(a[sortKey]));
 }
+let priorityPageState = { page: 1, perPage: 20 };
 function renderPriority(tab){
   const sortKey = tab==='risk'?'Open_SO_Qty':(tab==='prod'?'Open_WO_Qty':'Available');
-  const rows = topBy(tab, sortKey);
+  const allRows = topBy(tab, sortKey);
+  const totalPages = Math.max(1, Math.ceil(allRows.length/priorityPageState.perPage));
+  priorityPageState.page = Math.min(priorityPageState.page, totalPages);
+  const start = (priorityPageState.page-1)*priorityPageState.perPage;
+  const rows = allRows.slice(start, start+priorityPageState.perPage);
   const showWO = tab==='prod';
   const showSupply = tab==='risk';
   const headRow = document.getElementById('priorityHeadRow');
@@ -1367,6 +1470,9 @@ function renderPriority(tab){
       </td>
     </tr>`;
   }).join('') || `<tr><td colspan="11" style="color:var(--text-faint); text-align:center; padding:20px;">No items in this category</td></tr>`;
+  document.getElementById('priorityPageInfo').textContent = `Page ${priorityPageState.page} of ${totalPages} — ${fmt(allRows.length)} SKU${allRows.length===1?'':'s'} total`;
+  document.getElementById('priorityPrevPage').disabled = priorityPageState.page<=1;
+  document.getElementById('priorityNextPage').disabled = priorityPageState.page>=totalPages;
 
   const covBtn = document.getElementById('dismissCoveredBtn');
   if(covBtn){
@@ -1383,10 +1489,13 @@ function renderPriority(tab){
     }
   }
 }
+document.getElementById('priorityPrevPage').addEventListener('click', ()=>{ priorityPageState.page--; renderPriority(document.querySelector('.tab-btn.active').dataset.tab); });
+document.getElementById('priorityNextPage').addEventListener('click', ()=>{ priorityPageState.page++; renderPriority(document.querySelector('.tab-btn.active').dataset.tab); });
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
+    priorityPageState.page = 1;
     renderPriority(btn.dataset.tab);
   });
 });
@@ -1519,6 +1628,13 @@ function getPlanningFiltered(){
   return rows;
 }
 
+function planningCoveredInfo(d){
+  const targetTwoMo = (d.MonthlySales !== null && d.MonthlySales !== undefined) ? d.MonthlySales * 2 : null;
+  const stockSufficient = targetTwoMo !== null && d.Available >= targetTwoMo;
+  const cov = SUPPLY_BY_SKU[d.SKU];
+  const isCovered = stockSufficient || (cov && (cov.Verdict === 'covered_fg' || cov.Verdict === 'covered_rm'));
+  return { stockSufficient, cov, isCovered };
+}
 function renderPlanning(){
   const rows = getPlanningFiltered();
   const totalPages = Math.max(1, Math.ceil(rows.length/pState.perPage));
@@ -1526,9 +1642,7 @@ function renderPlanning(){
   const start = (pState.page-1)*pState.perPage;
   const pageRows = rows.slice(start, start+pState.perPage);
   document.getElementById('planningBody').innerHTML = pageRows.map(d=>{
-    const targetTwoMo = (d.MonthlySales !== null && d.MonthlySales !== undefined) ? d.MonthlySales * 2 : null;
-    const stockSufficient = targetTwoMo !== null && d.Available >= targetTwoMo;
-    const cov = SUPPLY_BY_SKU[d.SKU];
+    const { stockSufficient, cov } = planningCoveredInfo(d);
     let oppCell, actionCell;
     if(stockSufficient){
       oppCell = `<span class="opp-badge yes">Available covers 2mo — no need</span>`;
@@ -1549,6 +1663,7 @@ function renderPlanning(){
     }
     return `
     <tr>
+      <td><input type="checkbox" class="row-check" data-sku="${d.SKU}" ${selectedSkus.has(d.SKU)?'checked':''}></td>
       <td class="sku-code sku-hover" data-sku="${d.SKU}">${esc(d.SKU)}</td>
       <td class="desc-cell" title="${esc(d.Description)}">${esc(d.Description)}</td>
       <td><span class="cat-pill">${esc(d.Category)}</span></td>
@@ -1558,16 +1673,30 @@ function renderPlanning(){
       <td class="num">${renderSuggestedQty(d.MonthlySales, d.SuggestedWOQty)}${d.SuggestedWOQty_RMConstrained ? `<div style="font-size:10.5px; color:var(--risk); margin-top:2px;">exceeds RM capacity</div>` : ''}</td>
       <td>${oppCell}</td>
       <td>
-        ${actionCell}
-        <button class="dismiss-btn" data-action="dismiss" data-sku="${d.SKU}" style="margin-top:6px;">Dismiss</button>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          ${actionCell}
+          <button class="dismiss-btn" data-action="dismiss" data-sku="${d.SKU}">Dismiss</button>
+        </div>
       </td>
     </tr>`;
-  }).join('') || `<tr><td colspan="9" style="color:var(--text-faint); text-align:center; padding:20px;">No matching SKUs — this SKU may not have production history to build a recipe from.</td></tr>`;
+  }).join('') || `<tr><td colspan="10" style="color:var(--text-faint); text-align:center; padding:20px;">No matching SKUs — this SKU may not have production history to build a recipe from.</td></tr>`;
   document.getElementById('planningResultCount').textContent = `${fmt(rows.length)} SKUs with recipe data`;
   document.getElementById('planningPageInfo').textContent = `Page ${pState.page} of ${totalPages}`;
   document.getElementById('planningPrevPage').disabled = pState.page<=1;
   document.getElementById('planningNextPage').disabled = pState.page>=totalPages;
+
+  const planCovBtn = document.getElementById('planningDismissCoveredBtn');
+  if(planCovBtn){
+    const coveredSkus = rows.filter(d=>planningCoveredInfo(d).isCovered).map(d=>d.SKU);
+    planCovBtn.style.display = coveredSkus.length ? 'inline-flex' : 'none';
+    planCovBtn.textContent = `Dismiss ${coveredSkus.length} already-covered item${coveredSkus.length===1?'':'s'}`;
+    planCovBtn.dataset.skus = JSON.stringify(coveredSkus);
+  }
 }
+document.getElementById('planningDismissCoveredBtn').addEventListener('click', function(){
+  const skus = JSON.parse(this.dataset.skus || '[]');
+  if(skus.length) openDismissModal(skus);
+});
 document.getElementById('planningSearch').addEventListener('input', e=>{ pState.search=e.target.value; pState.page=1; renderPlanning(); });
 document.getElementById('planningOppFilter').addEventListener('change', e=>{ pState.opp=e.target.value; pState.page=1; renderPlanning(); });
 document.getElementById('planningPrevPage').addEventListener('click', ()=>{ pState.page--; renderPlanning(); });
@@ -1655,17 +1784,34 @@ document.getElementById('reportsSearch').addEventListener('input', e=>{
 });
 
 let timelineSearch = '';
+let timelineSortKey = null, timelineSortDir = 0;
+function timelineSortValue(r, key){
+  if(key === 'wo_number'){
+    const n = parseInt(String(r.wo_number).replace(/^WO-/i,''), 10);
+    return isNaN(n) ? 0 : n;
+  }
+  return r[key];
+}
 function renderTimeline(){
   let rows = PRODUCTION_LINES.timeline;
   if(timelineSearch){
     const q = timelineSearch.toLowerCase();
     rows = rows.filter(r=> r.sku.toLowerCase().includes(q) || (r.description||'').toLowerCase().includes(q));
   }
+  if(timelineSortKey){
+    rows = [...rows].sort((a,b)=>{
+      let av = timelineSortValue(a, timelineSortKey), bv = timelineSortValue(b, timelineSortKey);
+      if(av===null || av===undefined) av = (typeof bv === 'string') ? '' : -Infinity;
+      if(bv===null || bv===undefined) bv = (typeof av === 'string') ? '' : -Infinity;
+      if(typeof av === 'string') return av.localeCompare(bv) * timelineSortDir;
+      return (av - bv) * timelineSortDir;
+    });
+  }
   document.getElementById('timelineBody').innerHTML = rows.map(r=>`
     <tr>
       <td style="font-family:var(--mono); font-size:12.5px;">${r.created_date ? esc(r.created_date) : '—'}</td>
       <td style="font-family:var(--mono); font-size:12.5px; ${r.scheduled_date?'color:var(--prod); font-weight:600;':'color:var(--text-faint);'}">${r.scheduled_date ? esc(r.scheduled_date) : 'Not scheduled'}</td>
-      <td class="sku-code">${esc(r.sku)}</td>
+      <td class="sku-code sku-hover" data-sku="${r.sku}">${esc(r.sku)}</td>
       <td class="desc-cell">${esc(r.description)}</td>
       <td><span class="cat-pill">${esc(r.category)}</span></td>
       <td><a class="wo-btn ${woAgeClass(r.created_date)}"${woAgeTitle(r.created_date)} href="${workOrderUrl(r.wo_number)}" target="_blank" rel="noopener">${esc(r.wo_number)}</a></td>
@@ -1675,6 +1821,23 @@ function renderTimeline(){
 }
 document.getElementById('timelineSearch').addEventListener('input', e=>{
   timelineSearch = e.target.value; renderTimeline();
+});
+document.querySelectorAll('#timelineTable thead th.sortable-th').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.key;
+    if(timelineSortKey !== key){
+      timelineSortKey = key; timelineSortDir = 1;
+    } else if(timelineSortDir === 1){
+      timelineSortDir = -1;
+    } else {
+      timelineSortKey = null; timelineSortDir = 0;
+    }
+    document.querySelectorAll('#timelineTable thead th.sortable-th').forEach(h=>h.classList.remove('sort-asc','sort-desc'));
+    if(timelineSortKey === key){
+      th.classList.add(timelineSortDir === 1 ? 'sort-asc' : 'sort-desc');
+    }
+    renderTimeline();
+  });
 });
 
 // ---------- Supply coverage ----------
