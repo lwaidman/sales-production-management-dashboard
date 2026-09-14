@@ -1139,13 +1139,22 @@ document.getElementById('categoryDetailClose').addEventListener('click', ()=>{
 });
 window.showCategoryDetail = showCategoryDetail;
 
-// ---------- Dismiss state (persisted via window.storage) ----------
+// ---------- Dismiss state (persisted via window.storage when available, localStorage otherwise) ----------
 let dismissed = {}; // { SKU: {reason, note, date} }
+const LOCAL_STORAGE_KEY = 'jc_dashboard_dismissed_skus';
 
 async function loadDismissed(){
   try{
-    const res = await window.storage.get('dismissed_skus', false);
-    dismissed = res && res.value ? JSON.parse(res.value) : {};
+    if(window.storage && typeof window.storage.get === 'function'){
+      const res = await window.storage.get('dismissed_skus', false);
+      dismissed = res && res.value ? JSON.parse(res.value) : {};
+      updateDismissedUI();
+      return;
+    }
+  }catch(e){ /* fall through to localStorage */ }
+  try{
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    dismissed = raw ? JSON.parse(raw) : {};
   }catch(e){
     dismissed = {};
   }
@@ -1153,7 +1162,13 @@ async function loadDismissed(){
 }
 async function saveDismissed(){
   try{
-    await window.storage.set('dismissed_skus', JSON.stringify(dismissed), false);
+    if(window.storage && typeof window.storage.set === 'function'){
+      await window.storage.set('dismissed_skus', JSON.stringify(dismissed), false);
+      return;
+    }
+  }catch(e){ /* fall through to localStorage */ }
+  try{
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dismissed));
   }catch(e){
     console.error('Failed to save dismissed items:', e);
   }
