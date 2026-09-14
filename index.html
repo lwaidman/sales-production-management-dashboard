@@ -156,6 +156,10 @@
   thead th:last-child{ border-top-right-radius: 8px; }
   thead th:hover{ color: var(--text); }
   thead th.num, tbody td.num{ text-align:right; font-family: var(--mono); }
+  .sort-arrow{ display:inline-block; width:10px; margin-left:3px; opacity:0.6; }
+  .sortable-th.sort-asc .sort-arrow::after{ content:"▲"; }
+  .sortable-th.sort-desc .sort-arrow::after{ content:"▼"; }
+  .sortable-th.sort-asc, .sortable-th.sort-desc{ color: var(--accent); }
   tbody td{ padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
   tbody tr:nth-child(even){ background: rgba(255,255,255,0.014); }
   tbody tr:hover{ background: rgba(79,165,255,0.05); }
@@ -652,6 +656,7 @@
         For SKUs currently at stockout risk, the "Opportunity" badge is replaced by the same incoming-shipment verdict shown in Supply Coverage (hover it for full purchase order detail). "Covered" means a shipment is already on the way and no new work order is needed. Other SKUs keep the simple stock-based Yes/No check.
         <br><br>"Suggested WO qty" targets 2 months of stock coverage based on monthly sales; it's capped by nothing here, so if it's larger than "Max units producible" you don't have enough raw material on hand or incoming to fully close the gap in one work order.
         <br><br>The "Opportunity" badge and "Create Work Order" button only appear when available inventory is <b>below</b> 2 months of sales. If your available stock already covers 2 months, it shows "no need" instead. SKUs without a monthly sales figure fall back to the simple raw-material-only check, since there's no 2-month target to compare against.
+        <br><br>Click any column header to sort — once for ascending, again for descending, a third time to go back to the default order. Hover a SKU to see its open sales orders (customer, PO number, order date, ship cancel). Use "Dismiss" to hide a SKU from this list with a reason — it also disappears from every other screen and shows up under Overview's "Dismissed items".
       </div>
       <input type="text" class="planning-search" id="planningSearch" placeholder="Search by SKU or description (e.g. RCF, Bully Stick)...">
       <div class="filter-bar" style="margin-top:-6px;">
@@ -666,13 +671,13 @@
         <table id="planningTable">
           <thead>
             <tr>
-              <th data-key="SKU">SKU</th>
-              <th data-key="Description">Description</th>
-              <th data-key="Category">Category</th>
-              <th data-key="Available" class="num">Available inventory</th>
+              <th data-key="SKU" class="sortable-th">SKU<span class="sort-arrow"></span></th>
+              <th data-key="Description" class="sortable-th">Description<span class="sort-arrow"></span></th>
+              <th data-key="Category" class="sortable-th">Category<span class="sort-arrow"></span></th>
+              <th data-key="Available" class="num sortable-th">Available inventory<span class="sort-arrow"></span></th>
               <th>Raw material recipe (per unit)</th>
-              <th data-key="MaxUnitsProducible" class="num">Max units producible</th>
-              <th class="num">Suggested WO qty (2mo target)</th>
+              <th data-key="MaxUnitsProducible" class="num sortable-th">Max units producible<span class="sort-arrow"></span></th>
+              <th data-key="SuggestedWOQty" class="num sortable-th">Suggested WO qty (2mo target)<span class="sort-arrow"></span></th>
               <th>Opportunity</th>
               <th></th>
             </tr>
@@ -848,10 +853,9 @@
     <label>Reason</label>
     <div class="reason-options" id="reasonOptions">
       <label class="reason-opt covered"><input type="radio" name="reason" value="Covered"><span>Covered</span></label>
-      <label class="reason-opt"><input type="radio" name="reason" value="Waiting shipment"><span>Waiting shipment</span></label>
-      <label class="reason-opt"><input type="radio" name="reason" value="DC product"><span>DC product</span></label>
-      <label class="reason-opt"><input type="radio" name="reason" value="To be discussed"><span>To be discussed</span></label>
-      <label class="reason-opt"><input type="radio" name="reason" value="Discontinued"><span>Discontinued</span></label>
+      <label class="reason-opt"><input type="radio" name="reason" value="Waiting Shipment"><span>Waiting Shipment</span></label>
+      <label class="reason-opt"><input type="radio" name="reason" value="DC Product"><span>DC Product</span></label>
+      <label class="reason-opt"><input type="radio" name="reason" value="To Be Discussed"><span>To Be Discussed</span></label>
       <label class="reason-opt"><input type="radio" name="reason" value="Other"><span>Other</span></label>
     </div>
     <label>Note (optional)</label>
@@ -1222,6 +1226,7 @@ modalConfirm.addEventListener('click', async ()=>{
   updateDismissedUI();
   renderPriority(document.querySelector('.tab-btn.active').dataset.tab);
   renderMain();
+  renderPlanning();
   if(currentDetailCategory) showCategoryDetail(currentDetailCategory);
 });
 
@@ -1231,6 +1236,7 @@ async function restoreSku(sku){
   updateDismissedUI();
   renderPriority(document.querySelector('.tab-btn.active').dataset.tab);
   renderMain();
+  renderPlanning();
 }
 
 function updateDismissedUI(){
@@ -1474,7 +1480,7 @@ document.querySelectorAll('#mainTable thead th').forEach(th=>{
 });
 
 // ---------- Planning view ----------
-let pState = { search:'', opp:'', page:1, perPage:25 };
+let pState = { search:'', opp:'', page:1, perPage:25, sortKey:null, sortDir:0 };
 
 function oppStatus(row){
   if(row.MaxUnitsProducible===null) return 'unknown';
@@ -1495,12 +1501,21 @@ function renderRecipe(row){
 }
 
 function getPlanningFiltered(){
-  let rows = PLANNING_DATA_NO_WO;
+  let rows = PLANNING_DATA_NO_WO.filter(d=>!isDismissed(d.SKU));
   if(pState.search){
     const q = pState.search.toLowerCase();
     rows = rows.filter(d=> d.SKU.toLowerCase().includes(q) || (d.Description||'').toLowerCase().includes(q));
   }
   if(pState.opp){ rows = rows.filter(d=> oppStatus(d)===pState.opp); }
+  if(pState.sortKey){
+    rows = [...rows].sort((a,b)=>{
+      let av = a[pState.sortKey], bv = b[pState.sortKey];
+      if(av===null || av===undefined) av = (typeof bv === 'string') ? '' : -Infinity;
+      if(bv===null || bv===undefined) bv = (typeof av === 'string') ? '' : -Infinity;
+      if(typeof av === 'string') return av.localeCompare(bv) * pState.sortDir;
+      return (av - bv) * pState.sortDir;
+    });
+  }
   return rows;
 }
 
@@ -1534,7 +1549,7 @@ function renderPlanning(){
     }
     return `
     <tr>
-      <td class="sku-code">${esc(d.SKU)}</td>
+      <td class="sku-code sku-hover" data-sku="${d.SKU}">${esc(d.SKU)}</td>
       <td class="desc-cell" title="${esc(d.Description)}">${esc(d.Description)}</td>
       <td><span class="cat-pill">${esc(d.Category)}</span></td>
       <td class="num ${d.Available<0?'neg':''}">${fmt(d.Available)}</td>
@@ -1542,7 +1557,10 @@ function renderPlanning(){
       <td class="num">${d.MaxUnitsProducible!==null ? fmt(Math.floor(d.MaxUnitsProducible)) : '—'}</td>
       <td class="num">${renderSuggestedQty(d.MonthlySales, d.SuggestedWOQty)}${d.SuggestedWOQty_RMConstrained ? `<div style="font-size:10.5px; color:var(--risk); margin-top:2px;">exceeds RM capacity</div>` : ''}</td>
       <td>${oppCell}</td>
-      <td>${actionCell}</td>
+      <td>
+        ${actionCell}
+        <button class="dismiss-btn" data-action="dismiss" data-sku="${d.SKU}" style="margin-top:6px;">Dismiss</button>
+      </td>
     </tr>`;
   }).join('') || `<tr><td colspan="9" style="color:var(--text-faint); text-align:center; padding:20px;">No matching SKUs — this SKU may not have production history to build a recipe from.</td></tr>`;
   document.getElementById('planningResultCount').textContent = `${fmt(rows.length)} SKUs with recipe data`;
@@ -1554,6 +1572,23 @@ document.getElementById('planningSearch').addEventListener('input', e=>{ pState.
 document.getElementById('planningOppFilter').addEventListener('change', e=>{ pState.opp=e.target.value; pState.page=1; renderPlanning(); });
 document.getElementById('planningPrevPage').addEventListener('click', ()=>{ pState.page--; renderPlanning(); });
 document.getElementById('planningNextPage').addEventListener('click', ()=>{ pState.page++; renderPlanning(); });
+document.querySelectorAll('#planningTable thead th.sortable-th').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.key;
+    if(pState.sortKey !== key){
+      pState.sortKey = key; pState.sortDir = 1;
+    } else if(pState.sortDir === 1){
+      pState.sortDir = -1;
+    } else {
+      pState.sortKey = null; pState.sortDir = 0;
+    }
+    document.querySelectorAll('#planningTable thead th.sortable-th').forEach(h=>h.classList.remove('sort-asc','sort-desc'));
+    if(pState.sortKey === key){
+      th.classList.add(pState.sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    }
+    renderPlanning();
+  });
+});
 
 // ---------- Production reports ----------
 function bucketByStatus(searchQuery){
