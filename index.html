@@ -183,11 +183,11 @@
   .wo-btn::after{ content:"↗"; font-size:10px; opacity:0.7; }
   .wo-btn:hover{ background: rgba(79,165,255,0.2); border-color: var(--accent); color: #E6E9EF; }
   @keyframes wo-blink{
-    0%, 100% { background: rgba(240,82,92,0.22); border-color: var(--risk); color: #ffb3b8; }
-    50% { background: rgba(240,82,92,0.55); border-color: #ff8189; color: #fff; }
+    0%, 100% { background: rgba(240,82,92,0.14); border-color: rgba(240,82,92,0.55); color: #ffb3b8; }
+    50% { background: rgba(240,82,92,0.28); border-color: rgba(240,82,92,0.85); color: #ffbcc0; }
   }
   .wo-btn.wo-stale{
-    animation: wo-blink 1.1s ease-in-out infinite;
+    animation: wo-blink 2.6s ease-in-out infinite;
     border-color: var(--risk); color: #ffb3b8;
   }
   .wo-btn.wo-stale:hover{ background: rgba(240,82,92,0.65); border-color: #ff8189; color: #fff; }
@@ -313,6 +313,11 @@
   .chart-hint{ font-size: 10.5px; color: var(--text-faint); margin-top: 6px; }
   .cat-chart-header{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom: 14px; flex-wrap:wrap; }
   .cat-chart-header .dismissed-toggle{ white-space:nowrap; }
+  #catChartTitle, #priorityTitle{ cursor:pointer; user-select:none; }
+  #priorityPanel.collapsed > *:not(#priorityTitle){ display:none; }
+  #catChartPanel.collapsed .chart-holder, #catChartPanel.collapsed .chart-hint, #catChartPanel.collapsed #catChartDesc{ display:none; }
+  #catChartPanel.collapsed #catChartBackBtn{ display:none !important; }
+  #catChartPanel.collapsed .cat-chart-header{ margin-bottom:0; }
 
   /* ---------- BULK ACTION BAR ---------- */
   .bulk-bar{
@@ -400,6 +405,9 @@
   .coverage-stat .lbl{ font-size: 10.5px; color: var(--text-faint); text-transform:uppercase; letter-spacing:0.03em; }
 
   /* ---------- WORK ORDER COVERAGE (Production Reports) ---------- */
+  #wocScroll{ overflow:auto; max-height: 70vh; border:1px solid var(--line); border-radius:8px; }
+  #wocTable{ border-collapse: separate; border-spacing: 0; }
+  #wocTable thead th{ position: sticky; top: 0; z-index: 3; box-shadow: 0 2px 0 var(--line); border-bottom: none; }
   .woc-stats{ display:flex; gap:26px; margin: 14px 0 10px; flex-wrap:wrap; }
   .woc-stat{ display:flex; flex-direction:column; gap:2px; cursor:pointer; padding:6px 10px; border-radius:8px; border:1px solid transparent; }
   .woc-stat:hover{ border-color: var(--line); }
@@ -420,6 +428,22 @@
   .woc-act{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .woc-created{ display:inline-block; font-size:12px; font-weight:700; color: var(--ok); cursor:default; }
   .woc-created .woc-sub{ font-weight:400; }
+  .woc-act.archived .woc-badge{ opacity:.5; }
+  .woc-covered-btn{ font-family: var(--sans); font-size:12px; font-weight:600; color: #2dd4bf; background: rgba(45,212,191,0.08); border:1px solid rgba(45,212,191,0.45); padding:6px 12px; border-radius:6px; cursor:pointer; white-space:nowrap; }
+  /* both action buttons in Work order coverage blink: Create keeps its green, Covered is a close teal-green */
+  @keyframes woc-blink-create{
+    0%, 100% { background: rgba(53,214,138,0.08); border-color: rgba(53,214,138,0.40); }
+    50%      { background: rgba(53,214,138,0.18); border-color: rgba(53,214,138,0.62); }
+  }
+  @keyframes woc-blink-covered{
+    0%, 100% { background: rgba(45,212,191,0.08); border-color: rgba(45,212,191,0.45); }
+    50%      { background: rgba(45,212,191,0.18); border-color: rgba(45,212,191,0.65); }
+  }
+  #wocBody .create-wo-btn{ animation: woc-blink-create 2.8s ease-in-out infinite; }
+  #wocBody .woc-covered-btn{ animation: woc-blink-covered 2.8s ease-in-out infinite; }
+  /* stop blinking while the pointer is on a button, so it is easy to read and click */
+  #wocBody .create-wo-btn:hover{ animation: none; background: rgba(53,214,138,0.38); border-color: var(--ok); }
+  #wocBody .woc-covered-btn:hover{ animation: none; background: rgba(45,212,191,0.38); border-color: #2dd4bf; }
   .coverage-detail{ font-size: 12px; color: var(--text-dim); line-height:1.6; }
   .coverage-detail .cd-line{ display:block; }
   .coverage-detail .cd-line b{ color: var(--text); font-family: var(--mono); }
@@ -498,7 +522,6 @@
     <button class="nav-btn active" data-view="overview">Overview</button>
     <button class="nav-btn" data-view="planning">Production Planning</button>
     <button class="nav-btn" data-view="reports">Production Reports</button>
-    <button class="nav-btn" data-view="supply">Supply Coverage</button>
     <button class="nav-btn" data-view="watchlist">Monthly Order Tracking</button>
   </div>
 
@@ -547,10 +570,10 @@
 
   <!-- CHARTS -->
   <div class="charts-row">
-    <div class="panel">
+    <div class="panel" id="catChartPanel">
       <div class="cat-chart-header">
         <div>
-          <div class="panel-title" id="catChartTitle" style="margin-bottom:2px;">Stock, demand and production by category</div>
+          <div class="panel-title" id="catChartTitle" style="margin-bottom:2px;" title="Click to hide / show the chart">Stock, demand and production by category</div>
           <div class="panel-desc" id="catChartDesc">Top 20 categories by number of SKUs — click any bar to drill in</div>
         </div>
         <button id="catChartBackBtn" class="dismissed-toggle" style="display:none;">← Back</button>
@@ -587,8 +610,8 @@
   </div>
 
   <!-- PRIORITY TABLE -->
-  <div class="panel" style="margin-bottom:22px;">
-    <div class="panel-title">Priority queue</div>
+  <div class="panel" id="priorityPanel" style="margin-bottom:22px;">
+    <div class="panel-title" id="priorityTitle" title="Click to hide / show the priority queue">Priority queue</div>
     <div class="panel-desc">The most critical SKUs on each front — what needs attention first</div>
     <div class="panel-desc" style="margin-top:4px;">Hover any SKU to see its open sales orders — customer, PO number, order date, ship cancel, and quantity.</div>
     <div class="tabs">
@@ -599,6 +622,7 @@
     </div>
     <div class="filter-bar" style="margin-top:10px;">
       <input type="text" id="prioritySearch" placeholder="Search by SKU, description, category or customer...">
+      <select id="priorityVerdictFilter" style="display:none;"></select>
     </div>
     <div style="overflow-x:auto;">
       <table id="priorityTable">
@@ -637,7 +661,7 @@
         <span>View dismissed</span><span class="count-pill" id="dismissedCount">0</span>
       </div>
       <div class="dismissed-toggle" id="pendingWOToggle">
-        <span>Work orders created</span><span class="count-pill" id="pendingWOCount">0</span>
+        <span>Archived work orders</span><span class="count-pill" id="pendingWOCount">0</span>
       </div>
       <div class="result-count" id="resultCount"></div>
     </div>
@@ -655,6 +679,7 @@
             <th data-key="Net_Position" class="num">Net position</th>
             <th data-key="Status_Operacional">Status</th>
             <th>Production order</th>
+            <th data-key="WOBalance" title="Is what is left on the current work order(s) enough to cover all open orders?">WO coverage</th>
             <th></th>
           </tr>
         </thead>
@@ -684,12 +709,12 @@
 
   <!-- PENDING WO PANEL -->
   <div class="panel" id="pendingWOPanel" style="margin-top:22px; display:none;">
-    <div class="panel-title">Work orders created</div>
-    <div class="panel-desc">SKUs where you clicked "Create Work Order" — hidden from Priority Queue and Planning since a work order should now exist for them. Restore if you clicked by mistake, or once the real work order shows up in the next data refresh this entry stops mattering.</div>
+    <div class="panel-title">Archived work orders</div>
+    <div class="panel-desc">SKUs you archived from Work order coverage with <b>Create Work Order</b> or <b>Covered</b>, or by clicking Create Work Order in the Priority Queue / Planning — hidden from those lists. Restore if you clicked by mistake; once a real work order shows up in a data refresh, this entry stops mattering.</div>
     <div style="overflow-x:auto;">
       <table>
         <thead>
-          <tr><th>SKU</th><th>Description</th><th>Date</th><th></th></tr>
+          <tr><th>SKU</th><th>Description</th><th>Type</th><th>Date</th><th></th></tr>
         </thead>
         <tbody id="pendingWOBody"></tbody>
       </table>
@@ -707,7 +732,7 @@
       <div class="planning-note">
         This list only shows SKUs with <b>no open work order</b> (any status — Created, Scheduled, In Progress, or Split). If a SKU already has a work order in progress, it won't appear here — check Production Reports or the "Production order" column on Overview instead.
         <br><br>Raw material requirements are estimated from historical work orders (raw material consumed ÷ finished units produced). Raw materials tracked by weight often use a <b>_KG</b> suffix (e.g. <b>RCF</b> vs <b>RCF_KG</b>) — each is matched to its own stock record and unit of measure, so figures for the two variants aren't combined.
-        For SKUs currently at stockout risk, the "Opportunity" badge is replaced by the same incoming-shipment verdict shown in Supply Coverage (hover it for full purchase order detail). "Covered" means a shipment is already on the way and no new work order is needed. Other SKUs keep the simple stock-based Yes/No check.
+        For SKUs currently at stockout risk, the "Opportunity" badge is replaced by the same incoming-shipment verdict shown in the Priority Queue (hover it for full purchase order detail). "Covered" means a shipment is already on the way and no new work order is needed. Other SKUs keep the simple stock-based Yes/No check.
         <br><br>"Suggested WO qty" targets 2 months of stock coverage based on monthly sales; it's capped by nothing here, so if it's larger than "Max units producible" you don't have enough raw material on hand or incoming to fully close the gap in one work order.
         <br><br>The "Opportunity" badge and "Create Work Order" button only appear when available inventory is <b>below</b> 2 months of sales. If your available stock already covers 2 months, it shows "no need" instead. SKUs without a monthly sales figure fall back to the simple raw-material-only check, since there's no 2-month target to compare against.
         <br><br>Click any column header to sort — once for ascending, again for descending, a third time to go back to the default order. Hover a SKU to see its open sales orders (customer, PO number, order date, ship cancel). Use "Dismiss" to hide a SKU from this list with a reason — it also disappears from every other screen and shows up under Overview's "Dismissed items".
@@ -770,7 +795,7 @@
     <div class="panel" id="woCoveragePanel">
       <div class="panel-title">Work order coverage</div>
       <div class="panel-desc">For every SKU that already has an open work order: is what's still left to produce enough to cover the open sales orders?</div>
-      <div class="panel-desc" style="margin-top:4px;"><b>Balance after WO</b> = Available + quantity left on its work order(s). Available already has open orders subtracted (negative = orders waiting for stock), so orders are not subtracted a second time. This is a quantity check only — it doesn't compare the WO schedule with ship-cancel dates. After you click <b>Create Work Order</b>, the SKU leaves this list and is kept under <b>WO created (archived)</b>.</div>
+      <div class="panel-desc" style="margin-top:4px;"><b>Balance after WO</b> = Available + quantity left on its work order(s). Available already has open orders subtracted (negative = orders waiting for stock), so orders are not subtracted a second time. This is a quantity check only — it doesn't compare the WO schedule with ship-cancel dates. <b>Create Work Order</b> opens the production system; <b>Covered</b> just archives the SKU. Either way it leaves this list and is kept under <b>Archived</b>.</div>
       <div class="woc-stats" id="wocStats"></div>
       <div class="filter-bar">
         <input type="text" id="wocSearch" placeholder="Search SKU, description, category, customer or WO number...">
@@ -779,11 +804,11 @@
           <option value="short">Needs a new work order</option>
           <option value="covered">Covered</option>
           <option value="no_orders">No open orders</option>
-          <option value="archived">WO created (archived)</option>
+          <option value="archived">Archived (WO created / covered)</option>
         </select>
         <div class="result-count" id="wocResultCount"></div>
       </div>
-      <div style="overflow-x:auto;">
+      <div id="wocScroll">
         <table id="wocTable">
           <thead>
             <tr>
@@ -805,47 +830,6 @@
     </div>
   </div>
   <!-- ================= END REPORTS VIEW ================= -->
-
-  <!-- ================= SUPPLY COVERAGE VIEW ================= -->
-  <div class="view" id="view-supply">
-    <div class="panel" style="margin-bottom:22px;">
-      <div class="panel-title">Supply coverage</div>
-      <div class="panel-desc">For every SKU at stockout risk — is a work order actually needed, or is something already on the way?</div>
-      <div class="supply-note">
-        Built from the Open PO Report. For each SKU at stockout risk, checks whether incoming purchase orders (finished goods or raw materials, approved only) will resolve the shortfall — and whether they'll land before the earliest ship-cancel date on open orders. "Ship cancel" used is the earliest one across all open sales orders for that SKU.
-        <br><br>"Suggested WO qty" targets 2 months of stock coverage: <b>(2 × monthly sales) − (net position + qty already in production + incoming finished goods)</b>. Shown as 0 when that target is already met. SKUs without a monthly sales figure show "No sales data".
-      </div>
-      <div class="coverage-stats" id="coverageStats"></div>
-    </div>
-
-    <div class="panel">
-      <div class="filter-bar">
-        <input type="text" id="supplySearch" placeholder="Search SKU or description...">
-        <select id="supplyVerdictFilter">
-          <option value="">All verdicts</option>
-          <option value="covered_fg">Covered — incoming stock</option>
-          <option value="covered_rm">Covered — raw material in time</option>
-          <option value="opportunity">Opportunity — raw material incoming</option>
-          <option value="opportunity_fg">Watch — product incoming (late/partial)</option>
-          <option value="no_coverage">No coverage — needs attention</option>
-        </select>
-        <div class="result-count" id="supplyResultCount"></div>
-      </div>
-      <div style="overflow-x:auto;">
-        <table id="supplyTable">
-          <thead>
-            <tr>
-              <th>SKU</th><th>Description</th><th>Category</th>
-              <th class="num">Shortfall</th><th>Ship cancel</th>
-              <th>Verdict</th><th class="num">Suggested WO qty</th><th>What's incoming</th>
-            </tr>
-          </thead>
-          <tbody id="supplyBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-  <!-- ================= END SUPPLY COVERAGE VIEW ================= -->
 
   <!-- ================= MONTHLY ORDER TRACKING VIEW ================= -->
   <div class="view" id="view-watchlist">
@@ -961,6 +945,14 @@
 const SKU_DATA = JSON.parse(document.getElementById('sku-data').textContent);
 const SUMMARY = JSON.parse(document.getElementById('summary-data').textContent);
 const BY_SKU = Object.fromEntries(SKU_DATA.map(d=>[d.SKU, d]));
+// Work-order coverage per SKU. Available already has open orders subtracted, so: balance = Available + what is LEFT on the WO(s).
+SKU_DATA.forEach(d=>{
+  if(d.OpenWOs && d.OpenWOs.length){
+    d.WOLeft = d.OpenWOs.reduce((s,w)=>s+(w.left||0),0);
+    d.WOBalance = d.Available + d.WOLeft;
+    d.WOVerdict = d.WOBalance < 0 ? 'short' : (d.Open_SO_Qty > 0 ? 'covered' : 'no_orders');
+  } else { d.WOLeft = null; d.WOBalance = null; d.WOVerdict = null; }
+});
 const PLANNING_DATA = JSON.parse(document.getElementById('planning-data').textContent);
 // Exclude SKUs that already have an open work order (any status: Created, Scheduled, In Progress, Split) —
 // Planning is for deciding whether to open a NEW work order, so items already in the pipeline don't belong here.
@@ -1094,6 +1086,7 @@ statusOrder.forEach(([key,cls])=>{
   div.title = `${statusLabel(key)}: ${count} (${pct}%) — click to filter`;
   div.dataset.status = cls;
   div.addEventListener('click', ()=>{
+    setCatChartCollapsed(true);          // hide the chart so the list for this colour takes its place
     state.status = cls;
     state.category = '';
     state.search = '';
@@ -1254,6 +1247,15 @@ document.getElementById('catChartBackBtn').addEventListener('click', ()=>{
 });
 updateCatChartHeader(catData.length);
 
+// ---------- Collapse / expand the chart (click its title) ----------
+function setCatChartCollapsed(collapsed){
+  document.getElementById('catChartPanel').classList.toggle('collapsed', collapsed);
+  if(!collapsed && typeof catChartInstance.resize === 'function') setTimeout(()=>catChartInstance.resize(), 30);
+}
+document.getElementById('catChartTitle').addEventListener('click', ()=>{
+  setCatChartCollapsed(!document.getElementById('catChartPanel').classList.contains('collapsed'));
+});
+
 // ---------- Category detail (click-through from chart) ----------
 function skusForCategory(label){
   if(label === 'Others'){
@@ -1384,16 +1386,18 @@ function updatePendingWOUI(){
     return `<tr>
       <td class="sku-code">${esc(sku)}</td>
       <td class="desc-cell">${esc(d.Description||'')}</td>
+      <td>${info.kind==='covered' ? '<span class="woc-badge covered">Covered</span>' : '<span class="woc-badge none">WO created</span>'}</td>
       <td style="color:var(--text-faint); font-family:var(--mono); font-size:11.5px;">${info.date}</td>
       <td><button class="restore-btn" data-action="restorewo" data-sku="${sku}">Restore</button></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="4" style="color:var(--text-faint); text-align:center; padding:20px;">No pending work orders</td></tr>`;
+  }).join('') || `<tr><td colspan="5" style="color:var(--text-faint); text-align:center; padding:20px;">Nothing archived</td></tr>`;
 }
-async function markPendingWO(sku){
-  pendingWO[sku] = { date: new Date().toISOString().slice(0,10) };
+async function markPendingWO(sku, kind){
+  pendingWO[sku] = { date: new Date().toISOString().slice(0,10), kind: kind || 'created' };
   await savePendingWO();
   updatePendingWOUI();
   renderPriority(document.querySelector('.tab-btn.active').dataset.tab);
+  renderMain();
   renderPlanning();
   renderWOCoverage();
 }
@@ -1402,6 +1406,7 @@ async function restorePendingWO(sku){
   await savePendingWO();
   updatePendingWOUI();
   renderPriority(document.querySelector('.tab-btn.active').dataset.tab);
+  renderMain();
   renderPlanning();
   renderWOCoverage();
 }
@@ -1550,8 +1555,9 @@ document.addEventListener('click', e=>{
   else if(action==='restorewo') restorePendingWO(sku);
   else if(action==='createwo'){
     window.open(CREATE_WO_URL, '_blank', 'noopener');
-    markPendingWO(sku);
+    markPendingWO(sku, 'created');
   }
+  else if(action==='markcovered') markPendingWO(sku, 'covered');   // archive only — does NOT open the production system
 });
 document.addEventListener('change', e=>{
   if(e.target.matches('input.row-check')){
@@ -1593,10 +1599,28 @@ function priorityMatchesSearch(d, q){
   if(custs && custs.some(c=>c.customer.toLowerCase().includes(q))) return true;
   return false;
 }
-let priorityPageState = { page: 1, perPage: 20, search: '' };
+let priorityPageState = { page: 1, perPage: 20, search: '', verdict: '' };
+document.getElementById('priorityTitle').addEventListener('click', ()=>{
+  document.getElementById('priorityPanel').classList.toggle('collapsed');
+});
+const PRIORITY_VERDICT_ORDER = ['covered_fg','covered_rm','opportunity','opportunity_fg','no_coverage'];
+function updatePriorityVerdictFilter(baseRows, tab){
+  const sel = document.getElementById('priorityVerdictFilter');
+  if(tab !== 'risk'){ sel.style.display = 'none'; return; }
+  const counts = {};
+  baseRows.forEach(d=>{ const c = SUPPLY_BY_SKU[d.SKU]; const v = c ? c.Verdict : 'none'; counts[v] = (counts[v]||0)+1; });
+  sel.innerHTML = `<option value="">All coverage levels (${baseRows.length})</option>` +
+    PRIORITY_VERDICT_ORDER.map(v=>`<option value="${v}">${VERDICT_META[v].label} (${counts[v]||0})</option>`).join('');
+  sel.value = priorityPageState.verdict;
+  sel.style.display = '';
+}
 function renderPriority(tab){
   const sortKey = tab==='risk'?'Open_SO_Qty':(tab==='prod'?'Open_WO_Qty':'Available');
   let allRows = topBy(tab, sortKey);
+  updatePriorityVerdictFilter(allRows, tab);
+  if(tab === 'risk' && priorityPageState.verdict){
+    allRows = allRows.filter(d=>{ const c = SUPPLY_BY_SKU[d.SKU]; return c && c.Verdict === priorityPageState.verdict; });
+  }
   if(priorityPageState.search){
     const q = priorityPageState.search.toLowerCase();
     allRows = allRows.filter(d=>priorityMatchesSearch(d, q));
@@ -1658,6 +1682,11 @@ function renderPriority(tab){
 }
 document.getElementById('priorityPrevPage').addEventListener('click', ()=>{ priorityPageState.page--; renderPriority(document.querySelector('.tab-btn.active').dataset.tab); });
 document.getElementById('priorityNextPage').addEventListener('click', ()=>{ priorityPageState.page++; renderPriority(document.querySelector('.tab-btn.active').dataset.tab); });
+document.getElementById('priorityVerdictFilter').addEventListener('change', e=>{
+  priorityPageState.verdict = e.target.value;
+  priorityPageState.page = 1;
+  renderPriority(document.querySelector('.tab-btn.active').dataset.tab);
+});
 document.getElementById('prioritySearch').addEventListener('input', e=>{
   priorityPageState.search = e.target.value;
   priorityPageState.page = 1;
@@ -1688,7 +1717,7 @@ buildCategoryFilterOptions();
 let state = { search:'', status:'', category:'', sortKey:'SKU', sortDir:1, page:1, perPage:50 };
 
 function getFiltered(){
-  let rows = SKU_DATA.filter(d=>!isDismissed(d.SKU));
+  let rows = SKU_DATA.filter(d=>!isDismissed(d.SKU) && !isPendingWO(d.SKU));
   if(state.search){
     const q = state.search.toLowerCase();
     rows = rows.filter(d=> d.SKU.toLowerCase().includes(q) || (d.Description||'').toLowerCase().includes(q));
@@ -1697,10 +1726,23 @@ function getFiltered(){
   if(state.category){ rows = rows.filter(d=> d.Category===state.category); }
   rows = [...rows].sort((a,b)=>{
     const av=a[state.sortKey], bv=b[state.sortKey];
+    if(av==null && bv==null) return 0;
+    if(av==null) return 1;            // SKUs with no value (e.g. no work order) always go last
+    if(bv==null) return -1;
     if(typeof av === 'string') return av.localeCompare(bv)*state.sortDir;
     return (av-bv)*state.sortDir;
   });
   return rows;
+}
+
+function woCoverageBadge(d){
+  if(!d.OpenWOs || !d.OpenWOs.length) return '<span style="color:var(--text-faint);">—</span>';
+  if(d.WOVerdict === 'short'){
+    const miss = Math.max(0, -d.WOBalance);
+    return `<span class="woc-badge short" title="Even after the work order(s) finish (${fmt(d.WOLeft)} left to produce), ${fmt(miss)} units of open orders would still be uncovered">Short by ${fmt(miss)}</span>`;
+  }
+  if(d.WOVerdict === 'covered') return `<span class="woc-badge covered" title="${d.Available>=0 ? 'Stock already covers all open orders' : 'What is left on the work order(s) covers all open orders'}">Covered</span>`;
+  return '<span class="woc-badge none" title="No open sales orders for this SKU">No open orders</span>';
 }
 
 function renderMain(){
@@ -1721,11 +1763,12 @@ function renderMain(){
       <td class="num ${d.Net_Position<0?'neg':''}">${fmt(d.Net_Position)}</td>
       <td><span class="badge ${statusClass(d.Status_Operacional)}">${statusLabel(d.Status_Operacional)}</span></td>
       <td>${renderWOCell(d)}</td>
+      <td>${woCoverageBadge(d)}</td>
       <td>
         <button class="dismiss-btn" data-action="dismiss" data-sku="${d.SKU}">Dismiss</button>
-        ${createWoButtonHtml(d)}
+        ${createWoButtonHtml(d)}${d.WOVerdict==='short' ? `<button class="create-wo-btn" data-action="createwo" data-sku="${d.SKU}" title="Create a new work order for about ${fmt(Math.max(0,-d.WOBalance))} units (opens the production system)">Create Work Order</button>` : ''}
       </td>
-    </tr>`).join('') || `<tr><td colspan="11" style="color:var(--text-faint); text-align:center; padding:20px;">No SKUs found</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="12" style="color:var(--text-faint); text-align:center; padding:20px;">No SKUs found</td></tr>`;
   document.getElementById('resultCount').textContent = `${fmt(rows.length)} SKUs`;
   document.getElementById('pageInfo').textContent = `Page ${state.page} of ${totalPages}`;
   document.getElementById('prevPage').disabled = state.page<=1;
@@ -1975,7 +2018,7 @@ function buildWOCoverageRows(){
     const verdict = balance < 0 ? 'short' : (orders > 0 ? 'covered' : 'no_orders');
     rows.push({ SKU:d.SKU, Description:d.Description, Category:d.Category, wos, qty, done, left, pct,
                 orders, avail, balance, verdict, rank: WOC_RANK[verdict], missing: Math.max(0, -balance),
-                archived: isPendingWO(d.SKU), archivedDate: (pendingWO[d.SKU]||{}).date || null });
+                archived: isPendingWO(d.SKU), archivedDate: (pendingWO[d.SKU]||{}).date || null, archivedKind: (pendingWO[d.SKU]||{}).kind || 'created' });
   });
   rows.sort((a,b)=> a.rank-b.rank || a.balance-b.balance || a.SKU.localeCompare(b.SKU));
   return rows;
@@ -2000,7 +2043,7 @@ function renderWOCoverage(){
   const all = everything.filter(r=>!r.archived);
   const counts = { short:0, covered:0, no_orders:0, archived: archivedRows.length };
   all.forEach(r=>counts[r.verdict]++);
-  const statDefs = [['short','Needs a new work order','risk'],['covered','Covered','ok'],['no_orders','No open orders','text-faint'],['archived','WO created (archived)','accent']];
+  const statDefs = [['short','Needs a new work order','risk'],['covered','Covered','ok'],['no_orders','No open orders','text-faint'],['archived','Archived','accent']];
   document.getElementById('wocStats').innerHTML = statDefs.map(([k,lbl,col])=>`
     <div class="woc-stat ${wocState.filter===k?'active':''}" data-woc="${k}">
       <span class="val" style="color:var(--${col});">${fmt(counts[k])}</span><span class="lbl">${lbl}</span>
@@ -2033,10 +2076,13 @@ function renderWOCoverage(){
       : r.verdict==='covered'
         ? `<span class="woc-badge covered">Covered</span><span class="woc-sub">${r.avail>=0 ? 'stock already covers it' : 'work order covers it'}</span>`
         : `<span class="woc-badge none">No open orders</span>`;
+    const archLabel = r.archivedKind==='covered' ? '✓ Covered' : '✓ WO Created';
+    const archTitle = r.archivedKind==='covered' ? 'You marked this SKU as covered' : 'You clicked Create Work Order for this SKU';
     const action = r.archived
-      ? `<span class="woc-created" title="You clicked Create Work Order for this SKU${r.archivedDate ? ' on '+r.archivedDate : ''}">✓ WO Created${r.archivedDate ? `<span class="woc-sub">${esc(r.archivedDate)}</span>` : ''}</span>`
+      ? `<span class="woc-created" title="${archTitle}${r.archivedDate ? ' on '+r.archivedDate : ''}">${archLabel}${r.archivedDate ? `<span class="woc-sub">${esc(r.archivedDate)}</span>` : ''}</span>`
       : (r.verdict==='short'
-          ? `<button class="create-wo-btn" data-action="createwo" data-sku="${r.SKU}" title="Create a new work order for about ${fmt(r.missing)} units">Create Work Order</button>`
+          ? `<button class="create-wo-btn" data-action="createwo" data-sku="${r.SKU}" title="Create a new work order for about ${fmt(r.missing)} units (opens the production system)">Create Work Order</button>`
+            + `<button class="woc-covered-btn" data-action="markcovered" data-sku="${r.SKU}" title="Mark as covered — archives this SKU without creating a work order">Covered</button>`
           : '');
     return `<tr>
       <td class="sku-code sku-hover" data-sku="${r.SKU}">${esc(r.SKU)}</td>
@@ -2049,9 +2095,9 @@ function renderWOCoverage(){
       <td class="num">${fmt(r.orders)}</td>
       <td class="num ${r.avail<0?'neg':''}">${fmt(r.avail)}</td>
       <td class="num ${r.balance<0?'neg':''}"><b>${fmt(r.balance)}</b></td>
-      <td><div class="woc-act">${badge}${action}</div></td>
+      <td><div class="woc-act ${r.archived?'archived':''}">${badge}${action}</div></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="10" style="color:var(--text-faint); text-align:center; padding:20px;">${viewingArchive && !q ? 'No work order created from this panel yet' : 'No matching SKUs'}</td></tr>`;
+  }).join('') || `<tr><td colspan="10" style="color:var(--text-faint); text-align:center; padding:20px;">${viewingArchive && !q ? 'Nothing archived yet' : 'No matching SKUs'}</td></tr>`;
   document.getElementById('wocResultCount').textContent = viewingArchive
     ? `${fmt(rows.length)} of ${fmt(archivedRows.length)} archived SKUs`
     : `${fmt(rows.length)} of ${fmt(all.length)} SKUs with an open work order`;
@@ -2070,7 +2116,7 @@ document.querySelectorAll('#wocTable thead th.sortable-th').forEach(th=>{
   });
 });
 
-// ---------- Supply coverage ----------
+// ---------- Coverage verdicts + hover tooltips (used by the Priority Queue) ----------
 const VERDICT_META = {
   covered_fg:     { label: 'Covered — incoming stock',        cls: 'covered' },
   covered_rm:     { label: 'Covered — raw material in time',  cls: 'covered' },
@@ -2212,74 +2258,6 @@ document.addEventListener('mouseout', e=>{
   if(!cell) return;
   coverageTooltip.classList.remove('visible');
 });
-
-function renderCoverageDetail(row){
-  if(row.Verdict === 'covered_fg' || row.Verdict === 'opportunity_fg'){
-    if(!row.IncomingFG_POs || row.IncomingFG_POs.length===0) return '<span style="color:var(--text-faint);">—</span>';
-    return row.IncomingFG_POs.map(po=>{
-      const late = row.ShipCancel && po.arrival && po.arrival > row.ShipCancel;
-      return `<span class="cd-line"><b>${esc(row.SKU)}</b> <span class="cd-tag">product</span> — PO ${esc(po.po_number)} — ${fmt(po.qty)} units, <span class="cd-date ${late?'late':''}">${po.arrival?esc(po.arrival):'no ETA'}</span> (${esc(po.vendor)})</span>`;
-    }).join('');
-  }
-  if(row.Verdict === 'covered_rm' || row.Verdict === 'opportunity'){
-    if(!row.RM_Detail || row.RM_Detail.length===0) return '<span style="color:var(--text-faint);">—</span>';
-    return row.RM_Detail.filter(i=>i.rm_incoming_qty>0).map(i=>{
-      const late = row.ShipCancel && i.rm_earliest_arrival && i.rm_earliest_arrival > row.ShipCancel;
-      return `<span class="cd-line"><b>${esc(i.rm_sku)}</b> <span class="cd-tag">raw material</span> — ${fmt(i.rm_incoming_qty)} incoming, <span class="cd-date ${late?'late':''}">${i.rm_earliest_arrival?esc(i.rm_earliest_arrival):'no ETA'}</span> → up to ${fmt(Math.floor(i.units_possible_with_incoming||0))} units</span>`;
-    }).join('') || '<span style="color:var(--text-faint);">—</span>';
-  }
-  return '<span style="color:var(--text-faint);">Nothing incoming found</span>';
-}
-
-let supplyState = { search:'', verdict:'' };
-function getSupplyFiltered(){
-  let rows = SUPPLY_COVERAGE;
-  if(supplyState.search){
-    const q = supplyState.search.toLowerCase();
-    rows = rows.filter(r=> r.SKU.toLowerCase().includes(q) || (r.Description||'').toLowerCase().includes(q));
-  }
-  if(supplyState.verdict){ rows = rows.filter(r=> r.Verdict === supplyState.verdict); }
-  return rows;
-}
-function renderSupplyStats(){
-  const counts = {};
-  SUPPLY_COVERAGE.forEach(r=>{ counts[r.Verdict] = (counts[r.Verdict]||0)+1; });
-  const order = ['covered_fg','covered_rm','opportunity','opportunity_fg','no_coverage'];
-  document.getElementById('coverageStats').innerHTML = order.map(v=>{
-    const meta = VERDICT_META[v];
-    const n = counts[v] || 0;
-    return `<div class="coverage-stat" data-verdict="${v}">
-      <span class="val" style="color:var(--${meta.cls==='covered'?'ok':meta.cls==='opportunity'?'accent':meta.cls==='watch'?'prod':'risk'})">${n}</span>
-      <span class="lbl">${meta.label}</span>
-    </div>`;
-  }).join('');
-  document.querySelectorAll('.coverage-stat').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      supplyState.verdict = el.dataset.verdict;
-      document.getElementById('supplyVerdictFilter').value = el.dataset.verdict;
-      renderSupply();
-    });
-  });
-}
-function renderSupply(){
-  const rows = getSupplyFiltered();
-  document.getElementById('supplyBody').innerHTML = rows.map(r=>{
-    const meta = VERDICT_META[r.Verdict] || {label:r.Verdict, cls:'none'};
-    return `<tr>
-      <td class="sku-code">${esc(r.SKU)}</td>
-      <td class="desc-cell" title="${esc(r.Description)}">${esc(r.Description)}</td>
-      <td><span class="cat-pill">${esc(r.Category)}</span></td>
-      <td class="num neg">${fmt(Math.round(r.Shortfall))}</td>
-      <td style="font-family:var(--mono); font-size:12.5px;">${r.ShipCancel ? esc(r.ShipCancel) : '—'}</td>
-      <td><span class="verdict-badge ${meta.cls}" data-sku="${r.SKU}">${meta.label}</span></td>
-      <td class="num">${renderSuggestedQty(r.MonthlySales, r.SuggestedWOQty)}</td>
-      <td class="coverage-detail">${renderCoverageDetail(r)}</td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="8" style="color:var(--text-faint); text-align:center; padding:20px;">No matching SKUs</td></tr>`;
-  document.getElementById('supplyResultCount').textContent = `${fmt(rows.length)} SKUs at stockout risk`;
-}
-document.getElementById('supplySearch').addEventListener('input', e=>{ supplyState.search = e.target.value; renderSupply(); });
-document.getElementById('supplyVerdictFilter').addEventListener('change', e=>{ supplyState.verdict = e.target.value; renderSupply(); });
 
 // ---------- Monthly Order Tracking ----------
 function otMonthSort(a, b){ return a.localeCompare(b); }
@@ -2480,8 +2458,6 @@ populateOtFilters();
   renderPlanning();
   renderWOCoverage();
   renderProductionReports();
-  renderSupplyStats();
-  renderSupply();
   renderOt();
 })();
 </script>
