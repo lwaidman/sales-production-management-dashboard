@@ -425,9 +425,17 @@
   .woc-bar.done span{ background: var(--ok); }
   .woc-prog-txt{ font-family: var(--mono); font-size:11px; color: var(--text-dim); margin-top:4px; white-space:nowrap; }
   .woc-alert{ display:inline-block; font-size:10px; color: var(--prod); margin-left:6px; cursor:help; }
-  .woc-act{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  /* Coverage cell: one column — badge on top, then Create Work Order, then Covered; every item the same width and size */
+  .woc-act{ display:grid; grid-template-columns: 1fr; gap:6px; min-width:172px; }
+  .woc-act button{ width:100%; margin:0; padding:7px 10px; font-family: var(--sans); font-size:12px; font-weight:600; line-height:1.2; text-align:center; white-space:nowrap; border-radius:6px; }
+  .woc-act .woc-badge, .woc-act .woc-created{ text-align:center; }
+  .woc-act .woc-sub{ text-align:center; margin-top:0; }
   .woc-created{ display:inline-block; font-size:12px; font-weight:700; color: var(--ok); cursor:default; }
   .woc-created .woc-sub{ font-weight:400; }
+  .act-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:6px; min-width:216px; }
+  .act-grid.single{ grid-template-columns: 1fr; min-width:108px; }
+  .act-grid button{ width:100%; margin:0; padding:7px 10px; font-family: var(--sans); font-size:12px; font-weight:600; line-height:1.2; text-align:center; white-space:nowrap; border-radius:6px; }
+  .act-grid .create-wo-btn{ grid-column: 1 / -1; }
   #wocBody tr.woc-cont td:not(:nth-child(4)):not(:nth-child(5)):not(:nth-child(6)){ opacity:.45; }
   #wocBody td .num-sub, #wocBody .num .woc-sub{ text-align:right; }
   .woc-act.archived .woc-badge{ opacity:.5; }
@@ -1649,6 +1657,7 @@ function renderPriority(tab){
   body.innerHTML = rows.map(d=>{
     const cov = SUPPLY_BY_SKU[d.SKU];
     const covMeta = cov ? (VERDICT_META[cov.Verdict] || {label:cov.Verdict, cls:'none'}) : null;
+    const createBtn = createWoButtonHtml(d);   // '' when the SKU already has an open work order
     return `
     <tr>
       <td><input type="checkbox" class="row-check" data-sku="${d.SKU}" ${selectedSkus.has(d.SKU)?'checked':''}></td>
@@ -1662,8 +1671,11 @@ function renderPriority(tab){
       ${showWO ? `<td>${renderWOCell(d)}</td>` : ''}
       ${showSupply ? `<td>${covMeta ? `<span class="verdict-badge ${covMeta.cls}" data-sku="${d.SKU}">${covMeta.label}</span>` : '<span style="color:var(--text-faint);">—</span>'}</td><td class="num">${renderSuggestedQty(d.MonthlySales, d.Suggested_WO_Qty)}</td>` : ''}
       <td>
-        <button class="dismiss-btn" data-action="dismiss" data-sku="${d.SKU}">Dismiss</button>
-        ${createWoButtonHtml(d)}
+        <div class="act-grid ${createBtn ? '' : 'single'}">
+          ${createBtn}
+          ${createBtn ? `<button class="woc-covered-btn" data-action="markcovered" data-sku="${d.SKU}" title="Mark as covered — archives this SKU without creating a work order">Covered</button>` : ''}
+          <button class="dismiss-btn" data-action="dismiss" data-sku="${d.SKU}">Dismiss</button>
+        </div>
       </td>
     </tr>`;
   }).join('') || `<tr><td colspan="11" style="color:var(--text-faint); text-align:center; padding:20px;">No items in this category</td></tr>`;
