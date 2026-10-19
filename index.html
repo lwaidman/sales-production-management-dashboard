@@ -442,12 +442,13 @@
   .sku-detail{ box-sizing:border-box; position:sticky; left:0; padding: 12px 20px 16px 20px; animation: skuDetailIn .16s ease-out; }
   @keyframes skuDetailIn{ from{ opacity:0; transform: translateY(-4px); } to{ opacity:1; transform:none; } }
   .wocdd-card{ display:block; width:100%; max-width:none; box-sizing:border-box; background: var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:12.5px; color: var(--text); }
-  .sc-pill{ display:inline-block; padding:2px 10px; border-radius:12px; border:1px solid transparent; font-family: var(--mono); font-size:11.5px; }
+  .sc-pill{ white-space:nowrap; display:inline-block; padding:2px 10px; border-radius:12px; border:1px solid transparent; font-family: var(--mono); font-size:11.5px; }
   .sc-pill.sc-past{ color:#ffb3b8; border-color: rgba(240,82,92,0.45); background: rgba(240,82,92,0.12); animation: sc-blink-past 2.6s ease-in-out infinite; }
   .sc-pill.sc-soon{ color: var(--prod); border-color: rgba(245,185,77,0.45); background: rgba(245,185,77,0.10); animation: sc-blink-soon 2.6s ease-in-out infinite; }
   .sc-pill.sc-ok{ color: var(--ok); border-color: rgba(53,214,138,0.35); background: rgba(53,214,138,0.08); }
   @keyframes sc-blink-past{ 0%,100%{ background: rgba(240,82,92,0.12); border-color: rgba(240,82,92,0.45); } 50%{ background: rgba(240,82,92,0.26); border-color: rgba(240,82,92,0.80); } }
   @keyframes sc-blink-soon{ 0%,100%{ background: rgba(245,185,77,0.10); border-color: rgba(245,185,77,0.45); } 50%{ background: rgba(245,185,77,0.24); border-color: rgba(245,185,77,0.80); } }
+  .wocdd-hidden{ margin-top:8px; font-size:11px; color: var(--text-faint); }
   .wocdd-scroll{ max-height: 420px; overflow:auto; margin-top:2px; }
   .wocdd-table{ width:100%; border-collapse: separate; border-spacing:0; font-size:12px; }
   .wocdd-table th{ position:sticky; top:0; z-index:1; background: var(--panel); text-align:left; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color: var(--text-faint); padding:6px 12px; border-bottom:1px solid var(--line); cursor:default; white-space:nowrap; }
@@ -644,6 +645,7 @@
             <th>SKU</th><th>Description</th><th>Category</th>
             <th class="num">Available</th><th class="num">Open orders</th>
             <th class="num">In production</th><th class="num">Net position</th>
+            <th class="sortable-th" id="categoryShipTh" title="Earliest ship cancel among this SKU's open sales orders — click to sort, overdue first">Ship cancel<span class="sort-arrow"></span></th>
             <th>Status</th><th>Production order</th><th></th>
           </tr>
         </thead>
@@ -720,6 +722,7 @@
             <th data-key="Open_SO_Qty" class="num">Open orders</th>
             <th data-key="Open_WO_Qty" class="num">In production</th>
             <th data-key="Net_Position" class="num">Net position</th>
+            <th data-key="ShipCancelMin" title="Earliest ship cancel among this SKU's open sales orders — click to sort, overdue first">Ship cancel</th>
             <th data-key="Status_Operacional">Status</th>
             <th>Production order</th>
             <th data-key="WOBalance" title="Is what is left on the current work order(s) enough to cover all open orders?">WO coverage</th>
@@ -799,6 +802,7 @@
               <th data-key="Description" class="sortable-th">Description<span class="sort-arrow"></span></th>
               <th data-key="Category" class="sortable-th">Category<span class="sort-arrow"></span></th>
               <th data-key="Available" class="num sortable-th">Available inventory<span class="sort-arrow"></span></th>
+              <th data-key="ShipCancelMin" class="sortable-th" title="Earliest ship cancel among this SKU's open sales orders — click to sort, overdue first">Ship cancel<span class="sort-arrow"></span></th>
               <th>Raw material recipe (per unit)</th>
               <th data-key="MaxUnitsProducible" class="num sortable-th">Max units producible<span class="sort-arrow"></span></th>
               <th data-key="SuggestedWOQty" class="num sortable-th">Suggested WO qty (2mo target)<span class="sort-arrow"></span></th>
@@ -862,6 +866,7 @@
               <th data-key="pct" class="sortable-th">Progress<span class="sort-arrow"></span></th>
               <th data-key="left" class="num sortable-th">Left on WO<span class="sort-arrow"></span></th>
               <th data-key="orders" class="num sortable-th">Open orders<span class="sort-arrow"></span></th>
+              <th data-key="ShipCancelMin" class="sortable-th" title="Earliest ship cancel among this SKU's open sales orders — click to sort, overdue first">Ship cancel<span class="sort-arrow"></span></th>
               <th data-key="avail" class="num sortable-th">Available<span class="sort-arrow"></span></th>
               <th data-key="balance" class="num sortable-th">Balance after WO<span class="sort-arrow"></span></th>
               <th data-key="rank" class="sortable-th">Coverage<span class="sort-arrow"></span></th>
@@ -1005,7 +1010,40 @@ const PLANNING_DATA_NO_WO = PLANNING_DATA.filter(d=>{
 });
 const PRODUCTION_LINES = JSON.parse(document.getElementById('production-lines-data').textContent);
 const SUPPLY_COVERAGE = JSON.parse(document.getElementById('supply-coverage-data').textContent);
-const CUSTOMER_BREAKDOWN = JSON.parse(document.getElementById('customer-breakdown-data').textContent);
+const CUSTOMER_BREAKDOWN_ALL = JSON.parse(document.getElementById('customer-breakdown-data').textContent);
+// Only demand that is still to be picked is used anywhere on screen: order lines whose picked qty has reached the ordered qty are dropped.
+// (This feeds the expanded rows, their totals, the customer search and the ship-cancel column.)
+const CUSTOMER_BREAKDOWN = {};
+const FULLY_PICKED_HIDDEN = {};          // sku -> { lines, qty } that were left out, so the screen can say so
+Object.keys(CUSTOMER_BREAKDOWN_ALL).forEach(sku=>{
+  const kept = [], hidden = { lines:0, qty:0 };
+  CUSTOMER_BREAKDOWN_ALL[sku].forEach(c=>{
+    const orders = c.orders.filter(o=>{
+      const done = (o.picked || 0) >= o.qty;
+      if(done){ hidden.lines++; hidden.qty += o.qty; }
+      return !done;
+    });
+    if(orders.length) kept.push({ customer:c.customer, orders, order_count:orders.length,
+      qty_total: orders.reduce((s,o)=>s+o.qty,0), picked_total: orders.reduce((s,o)=>s+(o.picked||0),0) });
+  });
+  kept.sort((a,b)=>b.qty_total - a.qty_total);
+  if(kept.length) CUSTOMER_BREAKDOWN[sku] = kept;
+  if(hidden.lines) FULLY_PICKED_HIDDEN[sku] = hidden;
+});
+// Earliest ship cancel date among a SKU's open sales orders (YYYY-MM-DD, null when it has none). Sorting it ascending puts overdue SKUs first.
+SKU_DATA.forEach(d=>{
+  let min = null;
+  (CUSTOMER_BREAKDOWN[d.SKU] || []).forEach(c=>c.orders.forEach(o=>{ if(o.ship_cancel && (min === null || o.ship_cancel < min)) min = o.ship_cancel; }));
+  d.ShipCancelMin = min;
+});
+PLANNING_DATA.forEach(d=>{ const b = BY_SKU[d.SKU]; d.ShipCancelMin = b ? b.ShipCancelMin : null; });
+// ascending = earliest (overdue) first; SKUs without a date always go last, in either direction
+function cmpShipCancel(av, bv, dir){
+  if(av == null && bv == null) return 0;
+  if(av == null) return 1;
+  if(bv == null) return -1;
+  return av.localeCompare(bv) * dir;
+}
 const ORDER_LINES = JSON.parse(document.getElementById('order-lines-data').textContent);
 const SUPPLY_BY_SKU = Object.fromEntries(SUPPLY_COVERAGE.map(r=>[r.SKU, r]));
 let selectedSkus = new Set();
@@ -1308,7 +1346,8 @@ function skusForCategory(label){
   return SKU_DATA.filter(d=> d.Category === label);
 }
 let currentDetailCategory = null;
-function showCategoryDetail(label){
+let categoryShipSort = 0;   // 0 = default (most at-risk first), 1 = overdue first, -1 = latest first
+function showCategoryDetail(label, opts){
   currentDetailCategory = label;
   const rows = skusForCategory(label).filter(d=>!isDismissed(d.SKU));
   document.getElementById('categoryDetailName').textContent = label;
@@ -1323,7 +1362,8 @@ function showCategoryDetail(label){
     <div class="category-stat"><span class="val">${fmt(totalWO)}</span><span class="lbl">In production</span></div>
     <div class="category-stat"><span class="val" style="color:var(--risk);">${fmt(riskCount)}</span><span class="lbl">Stockout risk</span></div>
   `;
-  const sortedRows = [...rows].sort((a,b)=> a.Net_Position - b.Net_Position);
+  const sortedRows = [...rows].sort(categoryShipSort ? (a,b)=> cmpShipCancel(a.ShipCancelMin, b.ShipCancelMin, categoryShipSort) || a.SKU.localeCompare(b.SKU) : (a,b)=> a.Net_Position - b.Net_Position);
+  const shipTh = document.getElementById('categoryShipTh'); shipTh.classList.toggle('sort-asc', categoryShipSort === 1); shipTh.classList.toggle('sort-desc', categoryShipSort === -1);
   document.getElementById('categoryDetailBody').innerHTML = sortedRows.map(d=>`
     <tr>
       <td><input type="checkbox" class="row-check" data-sku="${d.SKU}" ${selectedSkus.has(d.SKU)?'checked':''}></td>
@@ -1334,16 +1374,21 @@ function showCategoryDetail(label){
       <td class="num">${fmt(d.Open_SO_Qty)}</td>
       <td class="num">${fmt(d.Open_WO_Qty)}</td>
       <td class="num ${d.Net_Position<0?'neg':''}">${fmt(d.Net_Position)}</td>
+      <td>${shipCancelHtml(d.ShipCancelMin)}</td>
       <td><span class="badge ${statusClass(d.Status_Operacional)}">${statusLabel(d.Status_Operacional)}</span></td>
       <td>${renderWOCell(d)}</td>
       <td>
         <button class="dismiss-btn" data-action="dismiss" data-sku="${d.SKU}">Dismiss</button>
         ${createWoButtonHtml(d)}
       </td>
-    </tr>`).join('') || `<tr><td colspan="11" style="color:var(--text-faint); text-align:center; padding:20px;">No SKUs in this category</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="12" style="color:var(--text-faint); text-align:center; padding:20px;">No SKUs in this category</td></tr>`;
   document.getElementById('categoryDetailPanel').style.display = 'block';
-  document.getElementById('categoryDetailPanel').scrollIntoView({behavior:'smooth', block:'start'});
+  if(!(opts && opts.noScroll)) document.getElementById('categoryDetailPanel').scrollIntoView({behavior:'smooth', block:'start'});
 }
+document.getElementById('categoryShipTh').addEventListener('click', ()=>{
+  categoryShipSort = categoryShipSort === 0 ? 1 : (categoryShipSort === 1 ? -1 : 0);
+  if(currentDetailCategory) showCategoryDetail(currentDetailCategory, { noScroll:true });     // re-sort in place, without jumping the page
+});
 document.getElementById('categoryDetailClose').addEventListener('click', ()=>{
   document.getElementById('categoryDetailPanel').style.display = 'none';
 });
@@ -1643,7 +1688,7 @@ function priorityMatchesSearch(d, q){
   if(custs && custs.some(c=>c.customer.toLowerCase().includes(q))) return true;
   return false;
 }
-let priorityPageState = { page: 1, perPage: 20, search: '', verdict: '' };
+let priorityPageState = { page: 1, perPage: 20, search: '', verdict: '', shipSort: 0 };   // shipSort: 0 = default order, 1 = overdue first, -1 = latest first
 function setPriorityCollapsed(collapsed){
   document.getElementById('priorityPanel').classList.toggle('collapsed', collapsed);
 }
@@ -1672,6 +1717,7 @@ function renderPriority(tab){
     const q = priorityPageState.search.toLowerCase();
     allRows = allRows.filter(d=>priorityMatchesSearch(d, q));
   }
+  if(priorityPageState.shipSort){ allRows = [...allRows].sort((a,b)=> cmpShipCancel(a.ShipCancelMin, b.ShipCancelMin, priorityPageState.shipSort) || a.SKU.localeCompare(b.SKU)); }
   const totalPages = Math.max(1, Math.ceil(allRows.length/priorityPageState.perPage));
   priorityPageState.page = Math.min(priorityPageState.page, totalPages);
   const start = (priorityPageState.page-1)*priorityPageState.perPage;
@@ -1684,6 +1730,7 @@ function renderPriority(tab){
     <th>SKU</th><th>Description</th><th>Category</th>
     <th class="num">Available</th><th class="num">Open orders</th>
     <th class="num">In production</th><th class="num">Net position</th>
+    <th class="sortable-th ${priorityPageState.shipSort===1?'sort-asc':(priorityPageState.shipSort===-1?'sort-desc':'')}" data-sort="ship" title="Earliest ship cancel among this SKU's open sales orders — click to sort, overdue first">Ship cancel<span class="sort-arrow"></span></th>
     ${showWO ? '<th>Production order</th>' : ''}
     ${showSupply ? '<th>Supply coverage</th><th class="num">Suggested WO qty</th>' : ''}<th></th>`;
   const body = document.getElementById('priorityBody');
@@ -1701,6 +1748,7 @@ function renderPriority(tab){
       <td class="num">${fmt(d.Open_SO_Qty)}</td>
       <td class="num">${fmt(d.Open_WO_Qty)}</td>
       <td class="num ${d.Net_Position<0?'neg':''}">${fmt(d.Net_Position)}</td>
+      <td>${shipCancelHtml(d.ShipCancelMin)}</td>
       ${showWO ? `<td>${renderWOCell(d)}</td>` : ''}
       ${showSupply ? `<td>${covMeta ? `<span class="verdict-badge ${covMeta.cls}" data-sku="${d.SKU}">${covMeta.label}</span>` : '<span style="color:var(--text-faint);">—</span>'}</td><td class="num">${renderSuggestedQty(d.MonthlySales, d.Suggested_WO_Qty)}</td>` : ''}
       <td>
@@ -1711,7 +1759,7 @@ function renderPriority(tab){
         </div>
       </td>
     </tr>`;
-  }).join('') || `<tr><td colspan="11" style="color:var(--text-faint); text-align:center; padding:20px;">No items in this category</td></tr>`;
+  }).join('') || `<tr><td colspan="12" style="color:var(--text-faint); text-align:center; padding:20px;">No items in this category</td></tr>`;
   document.getElementById('priorityPageInfo').textContent = `Page ${priorityPageState.page} of ${totalPages} — ${fmt(allRows.length)} SKU${allRows.length===1?'':'s'} total`;
   document.getElementById('priorityPrevPage').disabled = priorityPageState.page<=1;
   document.getElementById('priorityNextPage').disabled = priorityPageState.page>=totalPages;
@@ -1731,6 +1779,13 @@ function renderPriority(tab){
     }
   }
 }
+document.getElementById('priorityHeadRow').addEventListener('click', e=>{
+  if(!e.target.closest('th[data-sort="ship"]')) return;
+  const s = priorityPageState.shipSort;
+  priorityPageState.shipSort = s === 0 ? 1 : (s === 1 ? -1 : 0);          // 1st click: overdue first, 2nd: latest first, 3rd: back to the default order
+  priorityPageState.page = 1;
+  renderPriority(document.querySelector('.tab-btn.active').dataset.tab);
+});
 document.getElementById('priorityPrevPage').addEventListener('click', ()=>{ priorityPageState.page--; renderPriority(document.querySelector('.tab-btn.active').dataset.tab); });
 document.getElementById('priorityNextPage').addEventListener('click', ()=>{ priorityPageState.page++; renderPriority(document.querySelector('.tab-btn.active').dataset.tab); });
 document.getElementById('priorityVerdictFilter').addEventListener('change', e=>{
@@ -1812,6 +1867,7 @@ function renderMain(){
       <td class="num">${fmt(d.Open_SO_Qty)}</td>
       <td class="num">${fmt(d.Open_WO_Qty)}</td>
       <td class="num ${d.Net_Position<0?'neg':''}">${fmt(d.Net_Position)}</td>
+      <td>${shipCancelHtml(d.ShipCancelMin)}</td>
       <td><span class="badge ${statusClass(d.Status_Operacional)}">${statusLabel(d.Status_Operacional)}</span></td>
       <td>${renderWOCell(d)}</td>
       <td>${woCoverageBadge(d)}</td>
@@ -1819,7 +1875,7 @@ function renderMain(){
         <button class="dismiss-btn" data-action="dismiss" data-sku="${d.SKU}">Dismiss</button>
         ${createWoButtonHtml(d)}${d.WOVerdict==='short' ? `<button class="create-wo-btn" data-action="createwo" data-sku="${d.SKU}" title="Create a new work order for about ${fmt(Math.max(0,-d.WOBalance))} units (opens the production system)">Create Work Order</button>` : ''}
       </td>
-    </tr>`).join('') || `<tr><td colspan="12" style="color:var(--text-faint); text-align:center; padding:20px;">No SKUs found</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="13" style="color:var(--text-faint); text-align:center; padding:20px;">No SKUs found</td></tr>`;
   document.getElementById('resultCount').textContent = `${fmt(rows.length)} SKUs`;
   document.getElementById('pageInfo').textContent = `Page ${state.page} of ${totalPages}`;
   document.getElementById('prevPage').disabled = state.page<=1;
@@ -1884,6 +1940,7 @@ function getPlanningFiltered(){
   if(pState.opp){ rows = rows.filter(d=> oppStatus(d)===pState.opp); }
   if(pState.sortKey){
     rows = [...rows].sort((a,b)=>{
+      if(pState.sortKey === 'ShipCancelMin') return cmpShipCancel(a.ShipCancelMin, b.ShipCancelMin, pState.sortDir) || a.SKU.localeCompare(b.SKU);
       let av = a[pState.sortKey], bv = b[pState.sortKey];
       if(av===null || av===undefined) av = (typeof bv === 'string') ? '' : -Infinity;
       if(bv===null || bv===undefined) bv = (typeof av === 'string') ? '' : -Infinity;
@@ -1934,6 +1991,7 @@ function renderPlanning(){
       <td class="desc-cell" title="${esc(d.Description)}">${esc(d.Description)}</td>
       <td><span class="cat-pill">${esc(d.Category)}</span></td>
       <td class="num ${d.Available<0?'neg':''}">${fmt(d.Available)}</td>
+      <td>${shipCancelHtml(d.ShipCancelMin)}</td>
       <td>${renderRecipe(d)}</td>
       <td class="num">${d.MaxUnitsProducible!==null ? fmt(Math.floor(d.MaxUnitsProducible)) : '—'}</td>
       <td class="num">${renderSuggestedQty(d.MonthlySales, d.SuggestedWOQty)}${d.SuggestedWOQty_RMConstrained ? `<div style="font-size:10.5px; color:var(--risk); margin-top:2px;">exceeds RM capacity</div>` : ''}</td>
@@ -1945,7 +2003,7 @@ function renderPlanning(){
         </div>
       </td>
     </tr>`;
-  }).join('') || `<tr><td colspan="10" style="color:var(--text-faint); text-align:center; padding:20px;">No matching SKUs — this SKU may not have production history to build a recipe from.</td></tr>`;
+  }).join('') || `<tr><td colspan="11" style="color:var(--text-faint); text-align:center; padding:20px;">No matching SKUs — this SKU may not have production history to build a recipe from.</td></tr>`;
   document.getElementById('planningResultCount').textContent = `${fmt(rows.length)} SKUs with recipe data`;
   document.getElementById('planningPageInfo').textContent = `Page ${pState.page} of ${totalPages}`;
   document.getElementById('planningPrevPage').disabled = pState.page<=1;
@@ -2069,7 +2127,7 @@ function buildWOCoverageRows(){
     const balance = avail + left;
     const verdict = balance < 0 ? 'short' : (orders > 0 ? 'covered' : 'no_orders');
     rows.push({ SKU:d.SKU, Description:d.Description, Category:d.Category, wos, qty, done, left, pct,
-                orders, avail, balance, verdict, rank: WOC_RANK[verdict], missing: Math.max(0, -balance),
+                orders, avail, balance, verdict, rank: WOC_RANK[verdict], missing: Math.max(0, -balance), ship: d.ShipCancelMin,
                 archived: isPendingWO(d.SKU), archivedDate: (pendingWO[d.SKU]||{}).date || null, archivedKind: (pendingWO[d.SKU]||{}).kind || 'created' });
   });
   rows.sort((a,b)=> a.rank-b.rank || a.balance-b.balance || a.SKU.localeCompare(b.SKU));
@@ -2101,7 +2159,7 @@ function expandToWOLines(skuRows){
   });
   return out;
 }
-const WOC_LINE_KEY = { pct:'wPct', left:'wLeft' };   // sort keys that are per work order; all others are per SKU
+const WOC_LINE_KEY = { pct:'wPct', left:'wLeft', ShipCancelMin:'ship' };   // sort keys that are per work order; all others are per SKU
 function renderWOCoverage(){
   const everything = buildWOCoverageRows();
   const archivedRows = everything.filter(r=>r.archived);
@@ -2132,6 +2190,7 @@ function renderWOCoverage(){
     const k = WOC_LINE_KEY[wocState.sortKey] || wocState.sortKey, dir = wocState.sortDir;
     lines = [...lines].sort((a,b)=>{
       const av = a[k], bv = b[k];
+      if(k === 'ship'){ const s = cmpShipCancel(av, bv, dir); return s || a.SKU.localeCompare(b.SKU) || a.woOrder - b.woOrder; }
       const c = (typeof av === 'string' ? av.localeCompare(bv) : ((av||0) - (bv||0))) * dir;
       return c || a.SKU.localeCompare(b.SKU) || a.woOrder - b.woOrder;   // lines of one SKU stay together on ties
     });
@@ -2163,11 +2222,12 @@ function renderWOCoverage(){
         <div class="woc-prog-txt">${fmt(r.wDone)} / ${fmt(r.wQty)} · ${Math.round(r.wPct*100)}%</div></div></td>
       <td class="num">${fmt(r.wLeft)}</td>
       <td class="num">${fmt(r.orders)}</td>
+      <td>${shipCancelHtml(r.ship)}</td>
       <td class="num ${r.avail<0?'neg':''}">${fmt(r.avail)}</td>
       <td class="num ${r.balance<0?'neg':''}"><b>${fmt(r.balance)}</b>${multi}</td>
       <td><div class="woc-act ${r.archived?'archived':''}">${badge}${action}</div></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="10" style="color:var(--text-faint); text-align:center; padding:20px;">${viewingArchive && !q ? 'Nothing archived yet' : 'No matching SKUs'}</td></tr>`;
+  }).join('') || `<tr><td colspan="11" style="color:var(--text-faint); text-align:center; padding:20px;">${viewingArchive && !q ? 'Nothing archived yet' : 'No matching SKUs'}</td></tr>`;
   document.getElementById('wocResultCount').textContent = viewingArchive
     ? `${fmt(skuRows.length)} of ${fmt(archivedRows.length)} archived SKUs · ${fmt(lines.length)} work orders`
     : `${fmt(skuRows.length)} of ${fmt(all.length)} SKUs · ${fmt(lines.length)} work orders`;
@@ -2203,7 +2263,9 @@ function shipCancelHtml(d){
 function buildSkuDetailHtml(sku, desc){
   const custs = CUSTOMER_BREAKDOWN[sku] || [];
   let h = `<div class="wocdd-card"><div class="wocdd-head"><span class="wocdd-sku">${esc(sku)}</span><span class="wocdd-desc">${esc(desc)}</span></div>`;
-  if(!custs.length) return h + `<div class="wocdd-empty">No open sales orders for this SKU.</div></div>`;
+  const hid = FULLY_PICKED_HIDDEN[sku];
+  const hidNote = hid ? `<div class="wocdd-hidden">${hid.lines} fully picked order${hid.lines===1?'':'s'} hidden · ${fmt(hid.qty)} units</div>` : '';
+  if(!custs.length) return h + (hid ? `<div class="wocdd-empty">Nothing left to pick — all ${hid.lines} open order${hid.lines===1?' is':'s are'} already fully picked (${fmt(hid.qty)} units).</div>` : `<div class="wocdd-empty">No open sales orders for this SKU.</div>`) + `</div>`;
   const totQty = custs.reduce((s,c)=>s+c.qty_total,0), totPicked = custs.reduce((s,c)=>s+(c.picked_total||0),0);
   h += `<div class="wocdd-scroll"><table class="wocdd-table"><thead><tr><th>Order ID</th><th>P.O</th><th>Order date</th><th>Ship cancel</th><th class="num">Ordered qty</th><th class="num">Picked qty</th></tr></thead><tbody>`;
   custs.forEach(c=>{
@@ -2212,7 +2274,7 @@ function buildSkuDetailHtml(sku, desc){
       h += `<tr><td>${esc(o.order_id || '—')}</td><td>${esc(o.po_number || '—')}</td><td>${esc(o.order_date || '—')}</td><td>${shipCancelHtml(o.ship_cancel)}</td><td class="num">${fmt(o.qty)}</td><td class="num">${fmt(o.picked||0)}</td></tr>`;
     });
   });
-  h += `</tbody><tfoot><tr><td colspan="4">Total · ${custs.length} customer${custs.length===1?'':'s'}</td><td class="num">${fmt(totQty)}</td><td class="num">${fmt(totPicked)}</td></tr></tfoot></table></div></div>`;
+  h += `</tbody><tfoot><tr><td colspan="4">Total · ${custs.length} customer${custs.length===1?'':'s'}</td><td class="num">${fmt(totQty)}</td><td class="num">${fmt(totPicked)}</td></tr></tfoot></table></div>${hidNote}</div>`;
   return h;
 }
 function skuOfRow(tr){ const c = tr.querySelector('td.sku-code'); return c ? (c.dataset.sku || c.textContent.trim()) : null; }
