@@ -439,9 +439,9 @@
   tbody tr.sku-row-open > td{ background: rgba(79,165,255,0.14) !important; }
   tr.sku-detail-row, tr.sku-detail-row:hover{ background: rgba(79,165,255,0.07); cursor: default; }
   tr.sku-detail-row > td{ padding: 0 !important; }
-  .sku-detail{ padding: 12px 20px 16px 20px; animation: skuDetailIn .16s ease-out; }
+  .sku-detail{ box-sizing:border-box; position:sticky; left:0; padding: 12px 20px 16px 20px; animation: skuDetailIn .16s ease-out; }
   @keyframes skuDetailIn{ from{ opacity:0; transform: translateY(-4px); } to{ opacity:1; transform:none; } }
-  .wocdd-card{ display:block; width:100%; max-width:800px; background: var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:12.5px; color: var(--text); }
+  .wocdd-card{ display:block; width:100%; max-width:none; box-sizing:border-box; background: var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:12.5px; color: var(--text); }
   .sc-pill{ display:inline-block; padding:2px 10px; border-radius:12px; border:1px solid transparent; font-family: var(--mono); font-size:11.5px; }
   .sc-pill.sc-past{ color:#ffb3b8; border-color: rgba(240,82,92,0.45); background: rgba(240,82,92,0.12); animation: sc-blink-past 2.6s ease-in-out infinite; }
   .sc-pill.sc-soon{ color: var(--prod); border-color: rgba(245,185,77,0.45); background: rgba(245,185,77,0.10); animation: sc-blink-soon 2.6s ease-in-out infinite; }
@@ -2217,6 +2217,18 @@ function buildSkuDetailHtml(sku, desc){
 }
 function skuOfRow(tr){ const c = tr.querySelector('td.sku-code'); return c ? (c.dataset.sku || c.textContent.trim()) : null; }
 function detailRowOf(tr){ const n = tr.nextElementSibling; return (n && n.classList.contains('sku-detail-row')) ? n : null; }
+function scrollParentOf(el){
+  for(let p = el.parentElement; p; p = p.parentElement){
+    const ox = getComputedStyle(p).overflowX;
+    if(ox === 'auto' || ox === 'scroll') return p;
+  }
+  return document.documentElement;
+}
+function sizeSkuDetail(box){
+  const w = scrollParentOf(box).clientWidth;
+  if(w > 0) box.style.width = w + 'px';
+}
+window.addEventListener('resize', ()=>document.querySelectorAll('.sku-detail').forEach(sizeSkuDetail));
 function toggleSkuDetail(tr){
   const open = detailRowOf(tr);
   if(open){ open.remove(); tr.classList.remove('sku-row-open'); return; }
@@ -2226,6 +2238,7 @@ function toggleSkuDetail(tr){
   d.className = 'sku-detail-row';
   d.innerHTML = `<td colspan="${cols}"><div class="sku-detail">${buildSkuDetailHtml(skuOfRow(tr), descCell ? descCell.textContent : '')}</div></td>`;
   tr.after(d);                                  // inserted right under the clicked row: everything below moves down
+  sizeSkuDetail(d.querySelector('.sku-detail'));
   tr.classList.add('sku-row-open');
 }
 SKU_DD_TABLES.forEach(id=>{
