@@ -386,6 +386,11 @@
   .ms-tools{ display:flex; gap:14px; padding:2px 6px 6px; }
   .ms-tools button{ background:transparent; border:none; color: var(--accent); font-size:11.5px; cursor:pointer; padding:0; font-family: var(--sans); }
   .ms-tools button:hover{ text-decoration:underline; }
+  .ms-mode{ display:flex; margin:0 0 8px; border:1px solid var(--line); border-radius:7px; overflow:hidden; }
+  .ms-mode button{ flex:1; background:transparent; border:none; color: var(--text-dim); font-size:12px; padding:5px 0; cursor:pointer; font-family: var(--sans); }
+  .ms-mode button.on{ background: rgba(79,165,255,0.18); color: var(--text); font-weight:600; }
+  .ms-mode button[data-ms-mode=not].on{ background: rgba(240,82,92,0.18); color: var(--risk); }
+  .ms-btn.ms-not{ border-color: rgba(240,82,92,0.6); background: rgba(240,82,92,0.07); }
   .ms-hint{ font-size:10.5px; color: var(--text-faint); padding:2px 6px 8px; line-height:1.35; }
   .ms-list{ max-height:300px; overflow:auto; }
   .ms-opt{ display:flex; align-items:center; gap:9px; padding:5px 8px; border-radius:6px; font-size:12.5px; cursor:pointer; }
@@ -449,6 +454,11 @@
   .pk-tag.full{ background: rgba(53,214,138,0.14); color: var(--ok); animation: pk-blink-full 2.6s ease-in-out infinite; }
   @keyframes pk-blink-full{ 0%,100%{ background: rgba(53,214,138,0.12); box-shadow: 0 0 0 0 rgba(53,214,138,0); } 50%{ background: rgba(53,214,138,0.34); box-shadow: 0 0 0 1px rgba(53,214,138,0.5); } }
   .pk-tag.partial{ background: rgba(245,185,77,0.14); color: var(--prod); }
+  .pk-tag.skip{ background: #E8D13A; color: #2b2500; }
+  tr.og-skip td:not(.og-merged){ background: rgba(235,210,70,0.075); }
+  td.og-act-td{ white-space:nowrap; text-align:center; width:1%; }
+  button.skip-btn{ background: rgba(240,82,92,0.10); border:1px solid rgba(240,82,92,0.55); color: var(--risk); font-size:10.5px; font-weight:700; letter-spacing:0.05em; padding:2px 10px; border-radius:6px; cursor:pointer; font-family: var(--sans); }
+  button.skip-btn:hover, button.skip-btn.on{ background: rgba(240,82,92,0.24); }
   .pk-tag.none{ background: rgba(122,134,153,0.16); color: var(--parked); }
   .ord-stats{ display:flex; gap:30px; margin: 14px 0 10px; flex-wrap:wrap; }
   .ord-stat{ display:flex; flex-direction:column; gap:2px; }
@@ -1806,7 +1816,8 @@ document.addEventListener('click', e=>{
   }
   else if(action==='markcovered') markPendingWO(sku, 'covered');
   else if(action==='wopopup') openWoPopup(sku);
-  else if(action==='socomment') openSoComment(btn.dataset.k);   // archive only — does NOT open the production system
+  else if(action==='socomment') openSoComment(btn.dataset.k);
+  else if(action==='skip') toggleSkip(btn.dataset.k);
 });
 document.addEventListener('change', e=>{
   if(e.target.matches('input.row-check')){
@@ -2085,16 +2096,17 @@ const ORDER_LINES_FLAT = [];
       const picked = o.picked || 0, done = picked >= o.qty;
       ORDER_LINES_FLAT.push({ sku, desc: d ? d.Description : (descFallback[sku] || ''), category: d ? (d.Category || 'No category') : 'No category',
         customer: c.customer, order_id: o.order_id || '—', po: o.po_number || '—', ship: o.ship_cancel || '', qty: o.qty, picked, done,
-        status: done ? 'full' : (picked > 0 ? 'partial' : 'none') });     // full: picked = ordered | partial: 0 < picked < ordered | none: picked = 0
+        baseStatus: done ? 'full' : (picked > 0 ? 'partial' : 'none'), status: done ? 'full' : (picked > 0 ? 'partial' : 'none'), skip: false });     // full: picked = ordered | partial: 0 < picked < ordered | none: picked = 0
     }));
   });
 })();
-const PICK_LABEL = { full:'Fully Picked', partial:'Partially Picked', none:'Not Picked' };
+const PICK_LABEL = { full:'Fully Picked', partial:'Partially Picked', none:'Not Picked', skip:'Skip' };
 const WO_KEY_LABEL = { needs:'Needs a work order', has:'Has an open work order', ok:'No work order needed', done:'Fully picked — nothing to produce', unknown:'SKU not in the catalogue' };
 const ORD_FIELD_LABEL = { ship:'Ship cancel', customer:'Customer', sku:'SKU', order:'Order ID', po:'P.O', category:'Category', picked:'Picked status', wo:'Work order need' };
-const ORD_RANK = { picked:{ none:0, partial:1, full:2 }, wo:{ needs:0, has:1, ok:2, done:3, unknown:4 } };
+const ORD_RANK = { picked:{ none:0, partial:1, full:2, skip:3 }, wo:{ needs:0, has:1, ok:2, done:3, unknown:4 } };
 let ordState = { search:'', groups:['ship','customer'], sortBy:'ship', sortDir:'asc', level:'all',
-  f:{ picked:new Set(['none','partial']), wo:new Set(), ship:new Set(), customer:new Set(), category:new Set() } };   // a filter with nothing ticked does not restrict
+  f:{ picked:new Set(['none','partial','skip']), wo:new Set(), ship:new Set(), customer:new Set(), category:new Set() },
+  not:{ customer:false, category:false } };          // 'is not': show everything EXCEPT what is ticked   // a filter with nothing ticked does not restrict
 const ordToggled = new Set();          // group headers the user has clicked (flips their default open / closed state)
 const ordNeedCache = new Map();
 
@@ -2206,13 +2218,13 @@ function sortLines(ls){
 // ----- filters (every one is a multi-select) -----
 const ORD_KEYS = ['picked','wo','ship','customer','category'];
 const ORD_FILTER_DEFS = {
-  picked:   { label:'Picked',      opts:[['none','Not Picked'],['partial','Partially Picked'],['full','Fully Picked']] },
+  picked:   { label:'Picked',      opts:[['none','Not Picked'],['partial','Partially Picked'],['full','Fully Picked'],['skip','Skip']] },
   wo:       { label:'Work order',  opts:[['needs','Needs a work order'],['has','Has an open work order'],['ok','No work order needed']] },
   ship:     { label:'Ship cancel', opts:[['overdue','Overdue'],['soon','Due in less than 2 weeks'],['later','2 weeks or more'],['none','No ship cancel date']] },
-  customer: { label:'Customer',    searchable:true },
-  category: { label:'Category',    searchable:true }
+  customer: { label:'Customer',    searchable:true, negatable:true },
+  category: { label:'Category',    searchable:true, negatable:true }
 };
-const ORD_DEFAULTS = { picked:['none','partial'], wo:[], ship:[], customer:[], category:[] };      // default: only what is still to be picked
+const ORD_DEFAULTS = { picked:['none','partial','skip'], wo:[], ship:[], customer:[], category:[] };      // default: only what is still to be picked (plus the lines you marked Skip)
 const ORD_OPT_CACHE = {};
 ['customer','category'].forEach(k=>{ ORD_OPT_CACHE[k] = [...new Set(ORDER_LINES_FLAT.map(l=>l[k]))].sort((a,b)=>String(a).localeCompare(String(b), undefined, {numeric:true})).map(v=>[v, v]); });
 function optMatch(k, o, l){
@@ -2225,7 +2237,13 @@ function optMatch(k, o, l){
   }
   return false;
 }
-function passFilter(k, l){ const s = ordState.f[k]; if(!s.size) return true; for(const o of s) if(optMatch(k, o, l)) return true; return false; }
+function passFilter(k, l){
+  const s = ordState.f[k];
+  if(!s.size) return true;
+  let hit = false;
+  for(const o of s) if(optMatch(k, o, l)){ hit = true; break; }
+  return ordState.not[k] ? !hit : hit;
+}
 function searchMatch(l, q){
   const wos = (BY_SKU[l.sku] && BY_SKU[l.sku].OpenWOs) || [];
   return l.sku.toLowerCase().includes(q) || l.desc.toLowerCase().includes(q) || l.customer.toLowerCase().includes(q) ||
@@ -2238,6 +2256,8 @@ function renderOrdersView(){
   const body = document.getElementById('ordersBody');
   if(!body) return;
   ordNeedCache.clear();
+  const skips = soComments.skips || {};
+  ORDER_LINES_FLAT.forEach(l=>{ l.skip = !!skips[lineKey(l)]; l.status = l.skip ? 'skip' : l.baseStatus; });     // a skipped line shows as "Skip" instead of its picked status
   const q = ordState.search.toLowerCase().trim();
   const hiddenSkus = new Set();
   let lines = ORDER_LINES_FLAT.filter(l=>{ if(isDismissed(l.sku) || isPendingWO(l.sku)){ hiddenSkus.add(l.sku); return false; } return true; });
@@ -2251,17 +2271,17 @@ function renderOrdersView(){
   // ----- structure: which columns exist depends on how the list is grouped -----
   const fields = ordState.groups.filter((f,i,a)=>ORD_FIELD_LABEL[f] && a.indexOf(f) === i);
   const bySku = fields.includes('sku');
-  const cols = { order:true, sku:!bySku, desc:!bySku, customer:!fields.includes('customer'), po:true, ship:!fields.includes('ship'), qty:true, picked:true, status:!fields.includes('picked'), wo:!bySku, comments:true };
-  const heads = [['order','Order ID'],['sku','SKU'],['desc','Description'],['customer','Customer'],['po','P.O'],['ship','Ship cancel'],['qty','Qty ordered','num'],['picked','Qty picked','num'],['status','Picked'],['wo','Work order'],['comments','Comments']].filter(h=>cols[h[0]]);
+  const cols = { order:true, sku:!bySku, desc:!bySku, customer:!fields.includes('customer'), po:true, ship:!fields.includes('ship'), qty:true, picked:true, status:!fields.includes('picked'), wo:!bySku, comments:true, skip:true };
+  const heads = [['order','Order ID'],['sku','SKU'],['desc','Description'],['customer','Customer'],['po','P.O'],['ship','Ship cancel'],['qty','Qty ordered','num'],['picked','Qty picked','num'],['status','Picked'],['wo','Work order'],['comments','Comments'],['skip','Action']].filter(h=>cols[h[0]]);
   document.getElementById('ordersHeadRow').innerHTML = heads.map(h=>`<th class="${h[2]||''}">${h[1]}</th>`).join('');
   const ncols = heads.length, maxDepth = fields.length;
   const seen = new Set();            // Create / Covered buttons only once per SKU (on the first one that is on screen)
   const closedBy = (depth, path) => ((ordState.level === 'top') ? true : (ordState.level === 'headers' ? depth === maxDepth : false)) !== ordToggled.has(path);
 
-  const leafLine = (l, ind, merged) => `<tr class="og-line${l.done ? ' og-done' : ''}${merged && merged.first ? ' og-block-start' : ''}" data-sku="${esc(l.sku)}" data-order="${esc(l.order_id)}" data-status="${l.status}">
+  const leafLine = (l, ind, merged) => `<tr class="og-line${l.done ? ' og-done' : ''}${l.skip ? ' og-skip' : ''}${merged && merged.first ? ' og-block-start' : ''}" data-sku="${esc(l.sku)}" data-order="${esc(l.order_id)}" data-status="${l.status}">
       <td style="padding-left:${ind}px">${esc(l.order_id)}</td>${merged ? merged.cells : ''}
       ${cols.customer ? `<td class="og-cust-cell" title="${esc(l.customer)}">${esc(l.customer)}</td>` : ''}<td>${esc(l.po)}</td>${cols.ship ? `<td>${shipCancelHtml(l.ship)}</td>` : ''}
-      <td class="num">${fmt(l.qty)}</td><td class="num">${fmt(l.picked)}</td>${cols.status ? `<td class="og-status">${pkTag(l.status)}</td>` : ''}${merged && merged.wo ? merged.wo : ''}<td class="soc-td">${commentCell(l)}</td></tr>`;
+      <td class="num">${fmt(l.qty)}</td><td class="num">${fmt(l.picked)}</td>${cols.status ? `<td class="og-status">${pkTag(l.status)}</td>` : ''}${merged && merged.wo ? merged.wo : ''}<td class="soc-td">${commentCell(l)}</td><td class="og-act-td">${skipBtn(l)}</td></tr>`;
   // Leaf level. Not grouped by SKU: every SKU becomes one block — its SKU, description and work order status are shown ONCE (merged cells) next to all of its orders.
   const renderLeaf = (ls, depth) => {
     const ind = 14 + 16 * depth;
@@ -2322,7 +2342,7 @@ function renderOrdersView(){
   const customers = new Set(lines.map(l=>l.customer)), needSkus = new Set(lines.filter(l=>!l.done && skuNeed(l.sku).state === 'needs').map(l=>l.sku));
   document.getElementById('ordStats').innerHTML = [[lines.length,'Order lines','var(--text)'],[new Set(lines.map(l=>l.ship).filter(Boolean)).size,'Ship cancel dates','var(--text)'],[customers.size,'Customers','var(--text)'],[new Set(lines.map(l=>l.sku)).size,'SKUs','var(--text)'],[needSkus.size,'SKUs need a work order','var(--risk)']]
     .map(([v,l,c])=>`<div class="ord-stat"><span class="val" style="color:${c};">${fmt(v)}</span><span class="lbl">${l}</span></div>`).join('');
-  document.getElementById('ordResultCount').textContent = `${fmt(lines.length)} line${lines.length===1?'':'s'}` + (hiddenSkus.size ? ` · ${fmt(hiddenSkus.size)} archived / dismissed SKU${hiddenSkus.size===1?'':'s'} hidden` : '');
+  document.getElementById('ordResultCount').textContent = `${fmt(lines.length)} line${lines.length===1?'':'s'}` + (lines.some(l=>l.skip) ? ` · ${fmt(lines.filter(l=>l.skip).length)} skipped` : '') + (hiddenSkus.size ? ` · ${fmt(hiddenSkus.size)} archived / dismissed SKU${hiddenSkus.size===1?'':'s'} hidden` : '');
   msRefresh(facets);
 }
 
@@ -2331,19 +2351,22 @@ const GROUP_FIELDS = Object.keys(ORD_FIELD_LABEL);
 const msSearch = {};                      // text typed in a dropdown's own search box (customer, category)
 let msOpenId = null, lastFacets = null;
 const sameSet = (s, arr) => s.size === arr.length && arr.every(v=>s.has(v));
-function msShell(id, label, searchable){
+function msShell(id, label, searchable, negatable){
   return `<div class="ms" id="ms-${id}" data-k="${id}"><button type="button" class="ms-btn" data-ms-toggle="${id}"><span class="ms-lbl">${label}</span><span class="ms-val"></span><span class="ms-caret">▾</span></button>
-    <div class="ms-panel">${searchable ? '<input type="text" class="ms-search" placeholder="Search…">' : ''}
+    <div class="ms-panel">${negatable ? '<div class="ms-mode"><button type="button" data-ms-mode="is" class="on">is</button><button type="button" data-ms-mode="not">is not</button></div>' : ''}${searchable ? '<input type="text" class="ms-search" placeholder="Search…">' : ''}
       ${id === 'group' ? '<div class="ms-hint">Tick the fields to group by. The top of the list is the outermost group; use ▲ ▼ to reorder.</div>' : '<div class="ms-tools"><button type="button" data-ms-all>Select all</button><button type="button" data-ms-clear>Clear</button></div>'}
       <div class="ms-list"></div></div></div>`;
 }
 function msSummary(k, sel, opts){
-  if(k === 'picked' && sameSet(sel, ORD_DEFAULTS.picked)) return 'Still to pick';
-  if(!sel.size || sel.size === opts.length) return 'All';
+  if(k === 'picked' && sameSet(sel, ORD_DEFAULTS.picked)) return 'Still to pick + Skip';
+  if(k === 'picked' && sameSet(sel, ['none','partial'])) return 'Still to pick';
+  if(!sel.size) return 'All';
+  const neg = !!ordState.not[k], pre = neg ? 'not ' : '';
+  if(!neg && sel.size === opts.length) return 'All';
   const labels = opts.filter(o=>sel.has(o[0])).map(o=>o[1]);
-  if(labels.length === 1) return labels[0];
+  if(labels.length === 1) return pre + labels[0];
   const joined = labels.join(', ');
-  return joined.length <= 24 ? joined : `${labels.length} selected`;
+  return pre + (joined.length <= 24 ? joined : `${labels.length} selected`);
 }
 function msRefreshOne(k){
   const shell = document.getElementById('ms-' + k), sel = ordState.f[k], opts = ORD_FILTER_DEFS[k].opts || ORD_OPT_CACHE[k];
@@ -2354,7 +2377,10 @@ function msRefreshOne(k){
   });
   const needle = (msSearch[k] || '').toLowerCase();
   shell.querySelector('.ms-val').textContent = msSummary(k, sel, opts);
-  shell.querySelector('.ms-btn').classList.toggle('ms-on', !sameSet(sel, ORD_DEFAULTS[k]));
+  const negOn = !!ordState.not[k] && sel.size > 0;
+  shell.querySelector('.ms-btn').classList.toggle('ms-on', !sameSet(sel, ORD_DEFAULTS[k]) && !negOn);
+  shell.querySelector('.ms-btn').classList.toggle('ms-not', negOn);
+  shell.querySelectorAll('[data-ms-mode]').forEach(b=>b.classList.toggle('on', (b.dataset.msMode === 'not') === !!ordState.not[k]));
   shell.querySelector('.ms-list').innerHTML = opts.filter(o=>!needle || String(o[1]).toLowerCase().includes(needle)).map(o=>
     `<label class="ms-opt${counts.get(o[0]) ? '' : ' ms-zero'}"><input type="checkbox" value="${esc(o[0])}"${sel.has(o[0]) ? ' checked' : ''}><span class="ms-name">${esc(o[1])}</span><span class="ms-n">${fmt(counts.get(o[0]) || 0)}</span></label>`).join('')
     || '<div class="ms-empty">No match</div>';
@@ -2372,7 +2398,7 @@ function msRefresh(facets){
   lastFacets = facets;
   ORD_KEYS.forEach(msRefreshOne);
   msRefreshGroup();
-  document.getElementById('ordReset').hidden = ORD_KEYS.every(k=>sameSet(ordState.f[k], ORD_DEFAULTS[k])) && !ordState.search;
+  document.getElementById('ordReset').hidden = ORD_KEYS.every(k=>sameSet(ordState.f[k], ORD_DEFAULTS[k])) && !ordState.not.customer && !ordState.not.category && !ordState.search;
   document.getElementById('ordLevel').disabled = ordState.groups.length === 0;
 }
 function msClose(){
@@ -2392,7 +2418,7 @@ function msOpen(id){
 }
 function ordRerender(clearFolds){ if(clearFolds) ordToggled.clear(); renderOrdersView(); }
 (function msBuild(){
-  document.getElementById('ordFilters').innerHTML = ORD_KEYS.map(k=>msShell(k, ORD_FILTER_DEFS[k].label, ORD_FILTER_DEFS[k].searchable)).join('');
+  document.getElementById('ordFilters').innerHTML = ORD_KEYS.map(k=>msShell(k, ORD_FILTER_DEFS[k].label, ORD_FILTER_DEFS[k].searchable, ORD_FILTER_DEFS[k].negatable)).join('');
   document.getElementById('ordGroupWrap').innerHTML = msShell('group', 'Group by', false);
   const bar = document.querySelector('.ord-toolbar');
   bar.addEventListener('click', e=>{
@@ -2401,6 +2427,8 @@ function ordRerender(clearFolds){ if(clearFolds) ordToggled.clear(); renderOrder
     const shell = e.target.closest('.ms');
     if(!shell) return;
     const k = shell.dataset.k;
+    const md = e.target.closest('[data-ms-mode]');
+    if(md){ ordState.not[k] = md.dataset.msMode === 'not'; ordRerender(false); return; }
     if(e.target.closest('[data-ms-all]')){ ordState.f[k] = new Set((ORD_FILTER_DEFS[k].opts || ORD_OPT_CACHE[k]).map(o=>o[0])); ordRerender(false); return; }
     if(e.target.closest('[data-ms-clear]')){ ordState.f[k] = new Set(); ordRerender(false); return; }
     const mv = e.target.closest('[data-move]');
@@ -2432,6 +2460,7 @@ function ordRerender(clearFolds){ if(clearFolds) ordToggled.clear(); renderOrder
 })();
 document.getElementById('ordReset').addEventListener('click', ()=>{
   ORD_KEYS.forEach(k=>{ ordState.f[k] = new Set(ORD_DEFAULTS[k]); msSearch[k] = ''; });
+  ordState.not = { customer:false, category:false };
   ordState.search = ''; document.getElementById('ordSearch').value = '';
   document.querySelectorAll('.ms-search').forEach(s=>{ s.value = ''; });
   ordRerender(false);
@@ -2456,7 +2485,7 @@ document.getElementById('ordersBody').addEventListener('click', e=>{
 // order line is still in the sales-order report: when a data update no longer contains the line, its comments are dropped.
 const SOC_LS_KEY = 'jc_dashboard_so_comments', SOC_USER_LS_KEY = 'jc_dashboard_user';
 const SO_STAMP = (()=>{ const t = [...document.querySelectorAll('.source-tag')].find(e=>e.textContent.includes('Open SO Report')); const u = t && t.querySelector('.src-updated'); return u ? (u.dataset.timestamp || '') : ''; })();
-let soComments = { meta:{ soStamp:'' }, items:{} };      // items: { "orderId|sku": [ { u: user, t: ISO time, x: text } ] }
+let soComments = { meta:{ soStamp:'' }, items:{}, skips:{} };      // skips: { "orderId|sku": { u: user, t: ISO time } }      // items: { "orderId|sku": [ { u: user, t: ISO time, x: text } ] }
 let soUser = '', socKey = null;
 const lineKey = l => l.order_id + '|' + l.sku;
 function fmtStamp(iso){
@@ -2475,13 +2504,14 @@ async function soStoreSet(key, lsKey, value){
 }
 function saveSoComments(){ return soStoreSet('so_comments', SOC_LS_KEY, JSON.stringify(soComments)); }
 async function loadSoComments(){
-  try{ const raw = await soStoreGet('so_comments', SOC_LS_KEY); if(raw){ const p = JSON.parse(raw); if(p && p.items) soComments = { meta: p.meta || { soStamp:'' }, items: p.items }; } }catch(e){ /* start empty */ }
+  try{ const raw = await soStoreGet('so_comments', SOC_LS_KEY); if(raw){ const p = JSON.parse(raw); if(p && p.items) soComments = { meta: p.meta || { soStamp:'' }, items: p.items, skips: p.skips || {} }; } }catch(e){ /* start empty */ }
   soUser = (await soStoreGet('so_user', SOC_USER_LS_KEY)) || '';
   // keep a thread only while its order line is still in the report. Never clean up from an OLDER file than the one that last saved.
   if(!soComments.meta.soStamp || SO_STAMP >= soComments.meta.soStamp){
     const keys = new Set(ORDER_LINES_FLAT.map(lineKey));
     let changed = false;
     Object.keys(soComments.items).forEach(k=>{ if(!keys.has(k)){ delete soComments.items[k]; changed = true; } });
+    Object.keys(soComments.skips).forEach(k=>{ if(!keys.has(k)){ delete soComments.skips[k]; changed = true; } });
     if(soComments.meta.soStamp !== SO_STAMP){ soComments.meta.soStamp = SO_STAMP; changed = true; }
     if(changed) await saveSoComments();
   }
@@ -2497,6 +2527,15 @@ function refreshCommentCell(k){
   const l = ORDER_LINES_FLAT.find(x=>lineKey(x) === k);
   if(!l) return;
   document.querySelectorAll('#ordersBody button[data-action="socomment"]').forEach(b=>{ if(b.dataset.k === k) b.outerHTML = commentCell(l); });
+}
+function skipBtn(l){
+  return `<button class="skip-btn${l.skip ? ' on' : ''}" data-action="skip" data-k="${esc(lineKey(l))}" title="${l.skip ? 'Remove the Skip tag from this order line' : 'Mark this order line as Skip'}">${l.skip ? 'UNSKIP' : 'SKIP'}</button>`;
+}
+async function toggleSkip(k){
+  const s = soComments.skips || (soComments.skips = {});
+  if(s[k]) delete s[k]; else s[k] = { u: soUser || '', t: new Date().toISOString() };
+  await saveSoComments();
+  renderOrdersView();
 }
 const socPopup = document.createElement('div');
 socPopup.className = 'modal-overlay'; socPopup.id = 'socPopup';
