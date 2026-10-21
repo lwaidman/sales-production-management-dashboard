@@ -487,9 +487,9 @@
   .ms-move button:hover:not(:disabled){ color: var(--text); border-color: var(--text-dim); }
   .ms-move button:disabled{ opacity:.3; cursor:default; }
   /* ----- compact grid: more rows per screen ----- */
-  #ordersTable{ font-size:12px; }
-  #ordersTable thead th{ padding:8px 10px; }
-  #ordersTable tbody tr.og-line td{ padding:3px 10px; }
+  #ordersTable{ font-size: var(--ord-fs, 12px); }
+  #ordersTable thead th{ padding:8px 10px; font-size: var(--ord-fs, 12px); }
+  #ordersTable tbody tr.og-line td{ padding: var(--ord-pad, 3px) 10px; }
   tr.og-g1 > td{ padding:7px 12px; }
   tr.og-g2 > td{ padding:4px 12px 4px 28px; }
   tr.og-line td:first-child{ font-size:11.5px; }
@@ -538,6 +538,24 @@
   tr.og-skip td:not(.og-merged){ background: rgba(235,210,70,0.075); }
   tr.og-sel td:not(.og-merged){ background: rgba(79,165,255,0.17); }
   tr.og-sel td:first-child{ box-shadow: inset 3px 0 0 var(--accent); }
+  /* grid size: draggable column edges, draggable bottom bar, text size */
+  #ordersTable.ord-fixed{ table-layout: fixed; }
+  #ordersTable.ord-fixed thead th{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #ordersTable.ord-fixed tbody td{ overflow:hidden; }
+  #ordersTable.ord-fixed td.desc-cell, #ordersTable.ord-fixed td.og-cust-cell{ max-width:none; }
+  .col-rs{ position:absolute; top:0; right:0; width:9px; height:100%; cursor:col-resize; z-index:4; }
+  .col-rs::after{ content:""; position:absolute; right:3px; top:20%; bottom:20%; width:2px; border-radius:1px; background: var(--text-faint); opacity:0; }
+  #ordersTable thead th:hover .col-rs::after{ opacity:.55; }
+  .col-rs:hover::after, .col-rs.active::after{ opacity:1 !important; background: var(--accent); }
+  body.col-resizing, body.col-resizing *{ cursor:col-resize !important; user-select:none !important; }
+  body.row-resizing, body.row-resizing *{ cursor:row-resize !important; user-select:none !important; }
+  .ord-grip{ height:14px; cursor:row-resize; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+  .ord-grip::before{ content:""; width:56px; height:4px; border-radius:2px; background: var(--line); }
+  .ord-grip:hover::before{ background: var(--accent); }
+  .ord-size{ margin-left:auto; }
+  .ord-size button:not(.ord-reset){ height:34px; min-width:36px; padding:0 10px; background: var(--panel); border:1px solid var(--line); border-radius:8px; color: var(--text); font-family: var(--sans); font-size:12.5px; font-weight:600; cursor:pointer; }
+  .ord-size button:not(.ord-reset):hover:not(:disabled){ border-color: var(--text-dim); }
+  .ord-size button:disabled{ opacity:.4; cursor:default; }
   #ordersScroll.ord-dragging, #ordersScroll.ord-dragging *{ user-select:none !important; -webkit-user-select:none !important; }
   .ord-sum-balloon{ position:fixed; z-index:300; display:none; pointer-events:none; background: var(--balloon-bg); border:1px solid var(--line); border-radius:8px; padding:5px 10px 6px; font-size:11.5px; color: var(--text); box-shadow: 0 6px 18px var(--shadow-c); white-space:nowrap; }
   .ord-sum-balloon .osb-n{ color: var(--text-faint); margin-right:9px; }
@@ -1021,7 +1039,7 @@
     <div class="panel" style="margin-bottom:18px;">
       <div class="panel-title">Open sales orders</div>
       <div class="panel-desc">Open sales order lines, grouped the way you need (filters, grouping and sort are above) — and whether each item needs a work order. Every filter accepts several choices at once.</div>
-      <div class="panel-desc" style="margin-top:4px;">A SKU <b>needs a work order</b> when its Available (already net of open orders) plus what is left on its open work order(s) is still negative. Click a work order chip to see each work order's status, schedule and progress. The same item can appear on many orders: its orders, order IDs and P.O.s are listed together and its work order status is shown <b>once</b> for all of them. Click a group header to hide / show what is inside it. To add up quantities, select lines — drag over them, Ctrl+click (⌘ on Mac) to pick one by one, Shift+click for a range — and the totals appear next to the cursor (Esc clears). By default only what is still to be picked is listed; add <b>Fully Picked</b> in the Picked filter to see those lines too.</div>
+      <div class="panel-desc" style="margin-top:4px;">A SKU <b>needs a work order</b> when its Available (already net of open orders) plus what is left on its open work order(s) is still negative. Click a work order chip to see each work order's status, schedule and progress. The same item can appear on many orders: its orders, order IDs and P.O.s are listed together and its work order status is shown <b>once</b> for all of them. Click a group header to hide / show what is inside it. To add up quantities, select lines — drag over them, Ctrl+click (⌘ on Mac) to pick one by one, Shift+click for a range — and the totals appear next to the cursor (Esc clears). To resize the grid, drag the edge of a column header (double-click resets that column), drag the bar under the grid to change its height, and use A− / A+ for the text size. By default only what is still to be picked is listed; add <b>Fully Picked</b> in the Picked filter to see those lines too.</div>
       <div class="ord-stats" id="ordStats"></div>
       <div class="ord-toolbar">
         <div class="ord-row">
@@ -1051,6 +1069,11 @@
               <option value="top">Top-level groups only</option>
             </select>
           </div>
+          <div class="ord-pair ord-size"><span class="ord-lbl">Grid</span>
+            <button type="button" id="ordFsDown" title="Smaller text">A−</button>
+            <button type="button" id="ordFsUp" title="Larger text">A+</button>
+            <button type="button" id="ordLayoutReset" class="ord-reset" hidden title="Back to the original column widths, height and text size">Reset size</button>
+          </div>
         </div>
       </div>
       <div id="ordersScroll">
@@ -1059,6 +1082,7 @@
           <tbody id="ordersBody"></tbody>
         </table>
       </div>
+      <div id="ordGrip" class="ord-grip" title="Drag to change the height of the grid · double-click to reset"></div>
     </div>
   </div>
   <!-- ================= END PLANNING VIEW ================= -->
@@ -2365,7 +2389,8 @@ function renderOrdersView(){
   const bySku = fields.includes('sku');
   const cols = { order:true, sku:!bySku, desc:!bySku, customer:!fields.includes('customer'), po:true, ship:!fields.includes('ship'), qty:true, picked:true, status:!fields.includes('picked'), wo:!bySku, comments:true, skip:true };
   const heads = [['order','Order ID'],['sku','SKU'],['desc','Description'],['customer','Customer'],['po','P.O'],['ship','Ship cancel'],['qty','Qty ordered','num'],['picked','Qty picked','num'],['status','Picked'],['wo','Work order'],['comments','Comments'],['skip','Action']].filter(h=>cols[h[0]]);
-  document.getElementById('ordersHeadRow').innerHTML = heads.map(h=>`<th class="${h[2]||''}">${h[1]}</th>`).join('');
+  document.getElementById('ordersHeadRow').innerHTML = heads.map(h=>`<th class="${h[2]||''}" data-col="${h[0]}">${h[1]}<span class="col-rs" data-col="${h[0]}"></span></th>`).join('');
+  ordApplyLayout(heads);
   const ncols = heads.length, maxDepth = fields.length;
   const seen = new Set();            // Create / Covered buttons only once per SKU (on the first one that is on screen)
   const closedBy = (depth, path) => ((ordState.level === 'top') ? true : (ordState.level === 'headers' ? depth === maxDepth : false)) !== ordToggled.has(path);
@@ -2571,6 +2596,96 @@ document.getElementById('ordersBody').addEventListener('click', e=>{
   const k = tr.dataset.key;
   if(ordToggled.has(k)) ordToggled.delete(k); else ordToggled.add(k);
   renderOrdersView();
+});
+
+// ---------- Grid size: column widths (drag the header edges), grid height (drag the bar under it), text size ----------
+const ORD_DEFAULT_W = { order:100, sku:354, desc:230, customer:170, po:111, ship:111, qty:105, picked:97, status:114, wo:240, comments:170, skip:69 };   // what the automatic layout gives
+const ORD_MIN_W = 48, ORD_FS_MIN = 10, ORD_FS_MAX = 16, ORD_FS_DEFAULT = 12;
+let ordLayout = { widths:null, height:null, fs:ORD_FS_DEFAULT };          // widths: null = automatic (the original look) | { column: px }
+let ordHeads = [];
+const ordTable = document.getElementById('ordersTable'), ordScrollEl = document.getElementById('ordersScroll');
+function ordSaveLayout(){ soStoreSet('so_layout', 'jc_dashboard_so_layout', JSON.stringify(ordLayout)); }
+async function loadOrdLayout(){
+  try{
+    const raw = await soStoreGet('so_layout', 'jc_dashboard_so_layout');
+    if(raw){
+      const p = JSON.parse(raw), w = {};
+      if(p.widths) Object.keys(ORD_DEFAULT_W).forEach(k=>{ const v = Number(p.widths[k]); if(isFinite(v)) w[k] = Math.max(ORD_MIN_W, Math.min(1200, Math.round(v))); });
+      ordLayout = { widths: Object.keys(w).length ? Object.assign({}, ORD_DEFAULT_W, w) : null,
+                    height: isFinite(Number(p.height)) && p.height ? Math.max(160, Math.min(5000, Math.round(p.height))) : null,
+                    fs: Math.max(ORD_FS_MIN, Math.min(ORD_FS_MAX, Math.round(Number(p.fs) || ORD_FS_DEFAULT))) };
+    }
+  }catch(e){}
+  ordApplySize();
+}
+function ordApplyLayout(heads){                                            // called on every render, right after the header is drawn
+  ordHeads = heads;
+  const old = ordTable.querySelector('colgroup'); if(old) old.remove();
+  const w = ordLayout.widths;
+  if(!w){ ordTable.classList.remove('ord-fixed'); ordTable.style.width = ''; return; }
+  const widths = heads.map(h=>w[h[0]] || ORD_DEFAULT_W[h[0]]);
+  const cg = document.createElement('colgroup');
+  cg.innerHTML = heads.map((h,i)=>`<col data-col="${h[0]}" style="width:${widths[i]}px">`).join('');
+  ordTable.insertBefore(cg, ordTable.firstChild);
+  ordTable.classList.add('ord-fixed');
+  ordTable.style.width = widths.reduce((a,b)=>a+b, 0) + 'px';
+}
+function ordApplySize(){
+  ordTable.style.setProperty('--ord-fs', ordLayout.fs + 'px');
+  ordTable.style.setProperty('--ord-pad', Math.max(2, Math.round(ordLayout.fs / 4)) + 'px');
+  ordScrollEl.style.maxHeight = ordLayout.height ? ordLayout.height + 'px' : '';
+  document.getElementById('ordFsDown').disabled = ordLayout.fs <= ORD_FS_MIN;
+  document.getElementById('ordFsUp').disabled = ordLayout.fs >= ORD_FS_MAX;
+  document.getElementById('ordLayoutReset').hidden = !(ordLayout.widths || ordLayout.height || ordLayout.fs !== ORD_FS_DEFAULT);
+}
+function ordFreezeWidths(){                                                // first drag: keep every column exactly as it looks now, then start from there
+  const w = Object.assign({}, ORD_DEFAULT_W);
+  document.querySelectorAll('#ordersHeadRow th').forEach(th=>{ w[th.dataset.col] = Math.round(th.getBoundingClientRect().width); });
+  ordLayout.widths = w;
+  ordApplyLayout(ordHeads);
+}
+document.getElementById('ordersHeadRow').addEventListener('mousedown', e=>{
+  const rs = e.target.closest('.col-rs');
+  if(!rs || e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  const key = rs.dataset.col;
+  if(!ordLayout.widths) ordFreezeWidths();
+  const startX = e.clientX, startW = ordLayout.widths[key] || ORD_DEFAULT_W[key];
+  rs.classList.add('active'); document.body.classList.add('col-resizing');
+  const move = ev=>{
+    const nw = Math.max(ORD_MIN_W, Math.min(1200, Math.round(startW + ev.clientX - startX)));
+    ordLayout.widths[key] = nw;
+    const col = ordTable.querySelector(`col[data-col="${key}"]`); if(col) col.style.width = nw + 'px';
+    ordTable.style.width = ordHeads.reduce((s,h)=>s + (ordLayout.widths[h[0]] || ORD_DEFAULT_W[h[0]]), 0) + 'px';
+  };
+  const up = ()=>{
+    document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up);
+    rs.classList.remove('active'); document.body.classList.remove('col-resizing');
+    ordSaveLayout(); ordApplySize();
+  };
+  document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+});
+document.getElementById('ordersHeadRow').addEventListener('dblclick', e=>{          // double-click on an edge: that column goes back to its usual width
+  const rs = e.target.closest('.col-rs');
+  if(!rs || !ordLayout.widths) return;
+  ordLayout.widths[rs.dataset.col] = ORD_DEFAULT_W[rs.dataset.col];
+  ordApplyLayout(ordHeads); ordSaveLayout(); ordApplySize();
+});
+document.getElementById('ordGrip').addEventListener('mousedown', e=>{
+  if(e.button !== 0) return;
+  e.preventDefault();
+  const startY = e.clientY, startH = ordScrollEl.getBoundingClientRect().height;
+  document.body.classList.add('row-resizing');
+  const move = ev=>{ ordLayout.height = Math.max(160, Math.min(5000, Math.round(startH + ev.clientY - startY))); ordScrollEl.style.maxHeight = ordLayout.height + 'px'; };
+  const up = ()=>{ document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.classList.remove('row-resizing'); ordSaveLayout(); ordApplySize(); };
+  document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+});
+document.getElementById('ordGrip').addEventListener('dblclick', ()=>{ ordLayout.height = null; ordApplySize(); ordSaveLayout(); });
+document.getElementById('ordFsDown').addEventListener('click', ()=>{ ordLayout.fs = Math.max(ORD_FS_MIN, ordLayout.fs - 1); ordApplySize(); ordSaveLayout(); });
+document.getElementById('ordFsUp').addEventListener('click', ()=>{ ordLayout.fs = Math.min(ORD_FS_MAX, ordLayout.fs + 1); ordApplySize(); ordSaveLayout(); });
+document.getElementById('ordLayoutReset').addEventListener('click', ()=>{
+  ordLayout = { widths:null, height:null, fs:ORD_FS_DEFAULT };
+  ordApplySize(); ordSaveLayout(); renderOrdersView();
 });
 
 // ---------- Quick sum: select order lines and see the totals next to the cursor ----------
@@ -3393,6 +3508,7 @@ document.querySelectorAll('[data-theme-btn]').forEach(b=>b.addEventListener('cli
   await loadDismissed();
   await loadPendingWO();
   await loadSoComments();
+  await loadOrdLayout();
   const savedTheme = await soStoreGet('theme', THEME_LS_KEY);                                // the Claude.ai storage may hold it when localStorage is not available
   if((savedTheme === 'light' || savedTheme === 'dark') && savedTheme !== document.documentElement.getAttribute('data-theme')) { document.documentElement.setAttribute('data-theme', savedTheme); recolorCategoryChart(); }
   syncThemeButtons();
