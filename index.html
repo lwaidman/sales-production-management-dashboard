@@ -159,7 +159,7 @@
   .src-updated.stale{ color: var(--stale); }
 
   /* ---------- TOP NAV ---------- */
-  .top-nav{ display:flex; gap:8px; margin-bottom: 24px; }
+  .top-nav{ display:flex; gap:8px; margin-bottom: 14px; padding:10px 0; position:sticky; top:0; z-index:60; background: var(--bg); box-shadow: 0 1px 0 var(--line); }   /* the tab bar stays pinned while scrolling */
   .nav-btn{
     font-family: var(--sans); font-size: 13px; font-weight:700; color: var(--text-dim);
     background: var(--panel); border: 1px solid var(--line); padding: 10px 18px; border-radius: 8px;
@@ -419,9 +419,13 @@
   input.row-check, input.select-all-check{ accent-color: var(--accent); cursor:pointer; width: 16px; height: 16px; }
 
   /* ---------- OPEN SALES ORDERS (by ship cancel -> customer) ---------- */
-  #ordersScroll{ overflow:auto; max-height: 86vh; border:1px solid var(--line); border-radius:8px; }
+  #ordersScroll{ overflow:visible; max-height:none; border:none; border-radius:0; }                    /* the whole list is shown: the page scrolls, not the grid */
+  #view-planning > .panel{ background:transparent; border:none; padding:0; }                           /* no lighter box around the list */
+  .ord-grip{ display:none !important; }
+  .wrap:has(#view-planning.active){ max-width:none; padding-left:20px; padding-right:20px; padding-bottom:30px; }   /* this tab uses the whole window width */
+  .wrap:has(#view-planning.active) footer{ margin-top:16px; padding-top:12px; }
   #ordersTable{ border-collapse: separate; border-spacing: 0; }
-  #ordersTable thead th{ position: sticky; top: 0; z-index: 3; box-shadow: 0 2px 0 var(--line); border-bottom: none; cursor:default; }
+  #ordersTable thead th{ position: sticky; top: var(--nav-h, 0px); z-index: 3; box-shadow: 0 2px 0 var(--line); border-bottom: none; cursor:default; }
   #ordersTable tbody td{ vertical-align: top; }
   tr.og-g1 > td{ background: rgba(79,165,255,0.09); padding: 11px 14px; border-top: 2px solid var(--line); }
   tr.og-g2 > td, tr.og-g3 > td{ background: var(--panel-2); padding-top: 5px; padding-bottom: 5px; font-weight:700; }
@@ -496,11 +500,11 @@
   #ordersTable tbody tr.og-line td{ padding: var(--ord-pad, 3px) 10px; }
   tr.og-g1 > td{ padding:7px 12px; }
   /* the first-level group header (e.g. the ship cancel date) stays under the column titles while its group scrolls; the next one pushes it out */
-  tr.og-g1 > td{ position: sticky; top: calc(var(--ord-head-h, 34px) - 2px); z-index: 2; background: var(--panel-2); background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
+  tr.og-g1 > td{ position: sticky; top: calc(var(--nav-h, 0px) + var(--ord-head-h, 34px) - 2px); z-index: 2; background: var(--panel-2); background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
   tr.og-g1:hover > td{ background: var(--panel-2); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
   /* ...and the second-level one (e.g. the customer) sticks right under it; the next customer of the same group replaces it.
      Customers of OTHER groups are marked og-stale by the script, so an old customer never stays stuck under a new date. */
-  tr.og-g2:not(.og-stale) > td{ position: sticky; top: calc(var(--ord-head-h, 34px) + var(--ord-g1-h, 38px) - 3px); z-index: 1; }
+  tr.og-g2:not(.og-stale) > td{ position: sticky; top: calc(var(--nav-h, 0px) + var(--ord-head-h, 34px) + var(--ord-g1-h, 38px) - 3px); z-index: 1; }
   tr.og-g2:hover > td{ background: var(--panel-2); background: color-mix(in srgb, var(--accent) 9%, var(--panel-2)); }
   tr.og-g2 > td{ padding:4px 12px 4px 28px; }
   tr.og-line td:first-child{ font-size:11.5px; }
@@ -605,7 +609,7 @@
   #ordersBody td.og-merged{ border-right: 1px solid var(--grid-line); }
   #ordersTable tbody tr.og-block-start > td{ border-top: none; }                 /* the row above already draws that line: no double line */
   #ordersTable tbody tr.og-detail-row > td{ border-bottom: 1px solid var(--grid-line-2); }
-  #ordersScroll{ border-color: var(--grid-line-2); }
+  #ordersScroll{ border-color: transparent; }
   /* ---------- a colour per customer ---------- */
   .cu-chip, tr.og-cu-row{ --cl: var(--cl-d); }
   :root[data-theme="light"] .cu-chip, :root[data-theme="light"] tr.og-cu-row{ --cl: var(--cl-l); }
@@ -1103,7 +1107,7 @@
     <div class="panel" style="margin-bottom:18px;">
       <div class="panel-title">Open sales orders</div>
       <div class="panel-desc">Open sales order lines, grouped the way you need (filters, grouping and sort are above) — and whether each item needs a work order. Every filter accepts several choices at once.</div>
-      <div class="panel-desc" style="margin-top:4px;">A SKU <b>needs a work order</b> when its Available (already net of open orders) plus what is left on its open work order(s) is still negative. Click a work order chip to see each work order's status, schedule and progress. The same item can appear on many orders: its orders, order IDs and P.O.s are listed together and its work order status is shown <b>once</b> for all of them. Click a group header to hide / show what is inside it. Click any grey part of a line to open the incoming-goods dropdown for its SKU (containers already packed, ETA, POs, raw material). To add up quantities, select lines — drag over them, Ctrl+click (⌘ on Mac) to pick one by one, Shift+click for a range — and the totals appear next to the cursor (Esc clears). To resize the grid, drag the edge of a column header (double-click resets that column), drag the bar under the grid to change its height, and use A− / A+ for the text size. By default only what is still to be picked is listed; add <b>Fully Picked</b> in the Picked filter to see those lines too.</div>
+      <div class="panel-desc" style="margin-top:4px;">A SKU <b>needs a work order</b> when its Available (already net of open orders) plus what is left on its open work order(s) is still negative. Click a work order chip to see each work order's status, schedule and progress. The same item can appear on many orders: its orders, order IDs and P.O.s are listed together and its work order status is shown <b>once</b> for all of them. Click a group header to hide / show what is inside it. Click any grey part of a line to open the incoming-goods dropdown for its SKU (containers already packed, ETA, POs, raw material). To add up quantities, select lines — drag over them, Ctrl+click (⌘ on Mac) to pick one by one, Shift+click for a range — and the totals appear next to the cursor (Esc clears). To resize the grid, drag the edge of a column header (double-click resets that column), and use A− / A+ for the text size. By default only what is still to be picked is listed; add <b>Fully Picked</b> in the Picked filter to see those lines too.</div>
       <div class="ord-stats" id="ordStats"></div>
       <div class="ord-toolbar">
         <div class="ord-row">
@@ -2712,6 +2716,10 @@ async function loadOrdLayout(){
   }catch(e){}
   ordApplySize();
 }
+function ordNavH(){ const n = document.querySelector('.top-nav'); return n ? n.offsetHeight : 0; }
+function ordSyncNavH(){ document.documentElement.style.setProperty('--nav-h', ordNavH() + 'px'); }
+ordSyncNavH(); window.addEventListener('resize', ordSyncNavH);
+if(typeof ResizeObserver !== 'undefined') new ResizeObserver(ordSyncNavH).observe(document.querySelector('.top-nav'));
 function ordSyncHeadH(){                                                  // the sticky group header sits right under the column titles
   const h = document.getElementById('ordersHeadRow').offsetHeight;
   if(h > 0) ordTable.style.setProperty('--ord-head-h', h + 'px');
@@ -2725,15 +2733,15 @@ let ordCurG1 = null, ordTick = false;
 function ordUpdateStickyG2(force){                                         // which first-level group is "current" (its header is stuck at the top)?
   const g2s = document.querySelectorAll('#ordersBody tr.og-g2');
   if(!g2s.length){ ordCurG1 = null; return; }
-  const edge = ordScrollEl.scrollTop + document.getElementById('ordersHeadRow').offsetHeight - 2;           // the same point where the CSS sticks a date header (top = titles - 2px)
+  const edge = ordNavH() + document.getElementById('ordersHeadRow').offsetHeight - 2;                                   // the same point where the CSS sticks a date header (top = titles - 2px), measured from the top of the window
   let cur = null;
-  for(const r of document.querySelectorAll('#ordersBody tr.og-g1')){ if(r.offsetTop <= edge) cur = r; else break; }
+  for(const r of document.querySelectorAll('#ordersBody tr.og-g1')){ if(r.getBoundingClientRect().top <= edge + 1) cur = r; else break; }
   const key = cur ? cur.dataset.key : '';
   if(!force && key === ordCurG1) return;
   ordCurG1 = key;
   g2s.forEach(r=>r.classList.toggle('og-stale', !cur || !r.dataset.key.startsWith(key + '/')));    // only the current group's customers stay sticky
 }
-ordScrollEl.addEventListener('scroll', ()=>{ if(ordTick) return; ordTick = true; requestAnimationFrame(()=>{ ordTick = false; ordUpdateStickyG2(); }); }, { passive:true });
+window.addEventListener('scroll', ()=>{ if(ordTick) return; ordTick = true; requestAnimationFrame(()=>{ ordTick = false; ordUpdateStickyG2(); }); }, { passive:true });
 function ordApplyLayout(heads){                                            // called on every render, right after the header is drawn
   ordHeads = heads;
   setTimeout(ordSyncHeadH, 0);
@@ -2750,11 +2758,11 @@ function ordApplyLayout(heads){                                            // ca
 function ordApplySize(){
   ordTable.style.setProperty('--ord-fs', ordLayout.fs + 'px');
   ordTable.style.setProperty('--ord-pad', Math.max(2, Math.round(ordLayout.fs / 4)) + 'px');
-  ordScrollEl.style.maxHeight = ordLayout.height ? ordLayout.height + 'px' : '';
+  ordScrollEl.style.maxHeight = '';
   ordSyncHeadH(); ordSyncG1H();
   document.getElementById('ordFsDown').disabled = ordLayout.fs <= ORD_FS_MIN;
   document.getElementById('ordFsUp').disabled = ordLayout.fs >= ORD_FS_MAX;
-  document.getElementById('ordLayoutReset').hidden = !(ordLayout.widths || ordLayout.height || ordLayout.fs !== ORD_FS_DEFAULT);
+  document.getElementById('ordLayoutReset').hidden = !(ordLayout.widths || ordLayout.fs !== ORD_FS_DEFAULT);
 }
 function ordFreezeWidths(){                                                // first drag: keep every column exactly as it looks now, then start from there
   const w = Object.assign({}, ORD_DEFAULT_W);
@@ -2958,11 +2966,11 @@ function selRange(a, b, base){                                                  
 }
 function selAutoScroll(){                                                            // dragging near the top / bottom edge scrolls the grid
   if(!selDrag || !selDrag.moved) return;
-  const r = selScroll.getBoundingClientRect(), y = selMouse.y;
+  const y = selMouse.y, top = ordNavH() + document.getElementById('ordersHeadRow').offsetHeight + 40, bottom = window.innerHeight - 40;
   let dy = 0;
-  if(y < r.top + 40) dy = -Math.min(28, (r.top + 40 - y) / 2 + 4); else if(y > r.bottom - 40) dy = Math.min(28, (y - (r.bottom - 40)) / 2 + 4);
+  if(y < top) dy = -Math.min(28, (top - y) / 2 + 4); else if(y > bottom) dy = Math.min(28, (y - bottom) / 2 + 4);
   if(!dy) return;
-  selScroll.scrollTop += dy;
+  window.scrollBy(0, dy);
   const el = document.elementFromPoint ? document.elementFromPoint(selMouse.x, selMouse.y) : null, tr = el && el.closest && el.closest('#ordersBody tr.og-line');
   if(tr) selRange(selDrag.anchor, tr.dataset.k, selDrag.base);
 }
