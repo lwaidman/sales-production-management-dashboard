@@ -419,6 +419,10 @@
   input.row-check, input.select-all-check{ accent-color: var(--accent); cursor:pointer; width: 16px; height: 16px; }
 
   /* ---------- OPEN SALES ORDERS (by ship cancel -> customer) ---------- */
+  td.og-oid{ cursor:pointer; }
+  td.og-oid:hover{ text-decoration:underline; text-underline-offset:2px; }
+  .oid-toast{ position:fixed; z-index:9999; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:600; background:#111827; color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.3); pointer-events:none; opacity:0; transition:opacity .15s; }
+  .oid-toast.show{ opacity:1; }
   #ordersScroll{ overflow:visible; max-height:none; border:none; border-radius:0; }                    /* the whole list is shown: the page scrolls, not the grid */
   #view-planning > .panel{ background:transparent; border:none; padding:0; }                           /* no lighter box around the list */
   .ord-grip{ display:none !important; }
@@ -2490,7 +2494,7 @@ function renderOrdersView(){
   const closedBy = (depth, path) => ((ordState.level === 'top') ? true : (ordState.level === 'headers' ? depth === maxDepth : false)) !== ordToggled.has(path);
 
   const leafLine = (l, ind, merged, blk) => `<tr class="og-line og-cu${l.done ? ' og-done' : ''}${l.skip ? ' og-skip' : ''}${merged && merged.first ? ' og-block-start' : ''}" style="${custVars(l.customer)}" data-k="${esc(lineKey(l))}" data-sku="${esc(l.sku)}" data-order="${esc(l.order_id)}" data-status="${l.status}" data-blk="${blk}">
-      <td style="padding-left:${ind}px">${esc(l.order_id)}</td>${merged ? merged.cells : ''}
+      <td class="og-oid" data-oid="${esc(l.order_id)}" title="Click: copy order ID · Double-click: open in SellerCloud" style="padding-left:${ind}px">${esc(l.order_id)}</td>${merged ? merged.cells : ''}
       ${cols.customer ? `<td class="og-cust-cell">${custChip(l.customer)}</td>` : ''}<td>${esc(l.po)}</td>${cols.ship ? `<td>${shipCancelHtml(l.ship)}</td>` : ''}
       <td class="num">${fmt(l.qty)}</td><td class="num">${fmt(l.picked)}</td>${cols.status ? `<td class="og-status">${pkTag(l.status)}</td>` : ''}${merged && merged.wo ? merged.wo : ''}<td class="soc-td">${commentCell(l)}</td><td class="og-act-td">${skipBtn(l)}</td></tr>`;
   // Leaf level. Not grouped by SKU: every SKU becomes one block — its SKU, description and work order status are shown ONCE (merged cells) next to all of its orders.
@@ -2694,6 +2698,35 @@ document.getElementById('ordersBody').addEventListener('click', e=>{
   const k = tr.dataset.key;
   if(ordToggled.has(k)) ordToggled.delete(k); else ordToggled.add(k);
   renderOrdersView();
+});
+
+// ---------- Order ID: 1 click copies it, 2 clicks open the order in SellerCloud (new tab) ----------
+const SC_ORDER_URL = 'https://jcpetsupply.delta.sellercloud.us/orders/order-details.aspx?id=';
+let oidTimer = null, oidToastEl = null, oidToastTimer = null;
+function oidToast(msg, x, y){
+  if(!oidToastEl){ oidToastEl = document.createElement('div'); oidToastEl.className = 'oid-toast'; document.body.appendChild(oidToastEl); }
+  oidToastEl.textContent = msg;
+  oidToastEl.style.left = Math.min(x + 12, window.innerWidth - 190) + 'px'; oidToastEl.style.top = Math.max(4, y - 34) + 'px';
+  oidToastEl.classList.add('show');
+  clearTimeout(oidToastTimer); oidToastTimer = setTimeout(()=>oidToastEl.classList.remove('show'), 1200);
+}
+function oidCopy(txt){
+  if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).catch(()=>oidCopyFallback(txt));
+  oidCopyFallback(txt); return Promise.resolve();
+}
+function oidCopyFallback(txt){
+  const ta = document.createElement('textarea'); ta.value = txt; ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); }catch(_){} ta.remove();
+}
+document.getElementById('ordersBody').addEventListener('click', e=>{
+  const td = e.target.closest('td.og-oid');
+  if(!td) return;
+  const id = (td.dataset.oid || '').trim();
+  if(!id || id === '—') return;
+  const x = e.clientX, y = e.clientY;
+  clearTimeout(oidTimer); oidTimer = null;
+  if(e.detail >= 2){ window.open(SC_ORDER_URL + encodeURIComponent(id), '_blank', 'noopener'); return; }        // double click: open the order
+  oidTimer = setTimeout(()=>{ oidTimer = null; oidCopy(id); oidToast('Copied ' + id, x, y); }, 260);            // single click: copy (waits a moment in case it is a double click)
 });
 
 // ---------- Grid size: column widths (drag the header edges), grid height (drag the bar under it), text size ----------
@@ -2981,7 +3014,8 @@ document.getElementById('ordersBody').addEventListener('mousedown', e=>{
   selMouse = { x:e.clientX, y:e.clientY };
   const k = tr.dataset.k, additive = e.ctrlKey || e.metaKey;
   if(e.shiftKey && selAnchor){ e.preventDefault(); selRange(selAnchor, k, additive ? new Set(ordSel) : new Set()); return; }
-  selDrag = { anchor:k, startTr:tr, base: additive ? new Set(ordSel) : new Set(), additive, moved:false };
+  if(e.detail > 1 && e.target.closest('td.og-oid')) e.preventDefault();               // double-click on an order ID opens the order: no word selection
+  selDrag = { anchor:k, startTr:tr, base: additive ? new Set(ordSel) : new Set(), additive, moved:false, oid: !!e.target.closest('td.og-oid') && !e.shiftKey && !additive };
 });
 document.addEventListener('mousemove', e=>{
   selMouse = { x:e.clientX, y:e.clientY };
@@ -3004,7 +3038,7 @@ document.addEventListener('mouseup', ()=>{
   if(g && !g.isCollapsed && String(g).trim()) return;                                // the user selected some text inside a cell: leave it alone
   const k = d.anchor;
   if(d.additive){ if(ordSel.has(k)) ordSel.delete(k); else ordSel.add(k); }          // Ctrl / ⌘ + click: add or remove this line
-  else { selAnchor = k; ordToggleDetail(d.startTr); return; }                         // plain click on a grey area: the incoming-goods dropdown for this SKU
+  else { selAnchor = k; if(!d.oid) ordToggleDetail(d.startTr); return; }          // (a click on the order ID copies it instead, see below)                         // plain click on a grey area: the incoming-goods dropdown for this SKU
   selAnchor = k;
   selPaint();
 });
