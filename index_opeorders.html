@@ -885,6 +885,116 @@
     .desc-cell{ max-width: 140px; }
     .status-board{ grid-template-columns: 1fr; }
   }
+
+/* ================= Open Sales Orders — redesign (osv) ================= */
+#view-planning > .panel{ background:transparent; border:none; padding:0; box-shadow:none; }
+#view-planning .osv-top{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:4px 0 16px; }
+#view-planning .osv-title{ font-size:20px; font-weight:700; letter-spacing:-0.01em; color:var(--text-hi, var(--text)); }
+#view-planning .osv-subtitle{ font-size:13px; color:var(--text-dim); margin-top:3px; }
+#view-planning details.osv-help{ font-size:12.5px; color:var(--text-dim); max-width:560px; }
+#view-planning details.osv-help summary{ cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border:1px solid var(--line); border-radius:999px; background:var(--panel); color:var(--text-dim); font-size:12px; }
+#view-planning details.osv-help summary::-webkit-details-marker{ display:none; }
+#view-planning details.osv-help[open] summary{ color:var(--text); border-color:var(--text-faint); }
+#view-planning details.osv-help .osv-help-body{ margin-top:10px; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:12px; line-height:1.55; }
+#view-planning details.osv-help .osv-help-body p{ margin:0 0 8px; }
+#view-planning details.osv-help .osv-help-body p:last-child{ margin:0; }
+
+/* KPI cards */
+#view-planning .ord-stats{ display:grid; grid-template-columns:repeat(6, minmax(140px,1fr)); gap:10px; margin:0 0 14px; }
+#view-planning .osv-kpi{ display:flex; flex-direction:column; gap:1px; padding:12px 14px; background:var(--panel); border:1px solid var(--line); border-radius:12px; position:relative; transition:border-color .15s, background .15s; }
+#view-planning .osv-kpi .v{ font-family:var(--sans); font-size:24px; font-weight:700; letter-spacing:-0.02em; color:var(--text-hi, var(--text)); line-height:1.15; }
+#view-planning .osv-kpi .l{ font-size:12px; font-weight:600; color:var(--text-dim); }
+#view-planning .osv-kpi .s{ font-size:11px; color:var(--text-faint); }
+#view-planning .osv-kpi.red .v{ color:var(--risk-text, var(--risk)); }
+#view-planning .osv-kpi.amber .v{ color:var(--prod); }
+#view-planning .osv-kpi.osv-click{ cursor:pointer; }
+#view-planning .osv-kpi.osv-click:hover{ border-color:var(--text-faint); }
+#view-planning .osv-kpi.osv-click::after{ content:"filter"; position:absolute; top:10px; right:12px; font-size:10px; color:var(--text-faint); letter-spacing:.04em; text-transform:uppercase; opacity:0; transition:opacity .15s; }
+#view-planning .osv-kpi.osv-click:hover::after{ opacity:1; }
+#view-planning .osv-kpi.on{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+#view-planning .osv-kpi.on::after{ content:"filtered ✕"; opacity:1; color:var(--accent); }
+@media (max-width:1100px){ #view-planning .ord-stats{ grid-template-columns:repeat(3, 1fr); } }
+
+/* toolbar */
+#view-planning .ord-toolbar{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; gap:10px; margin:0 0 14px; }
+#view-planning .ord-toolbar .ord-search{ height:38px; font-size:13px; border-radius:10px; padding-left:36px; background:var(--panel-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a94a3' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px center; }
+#view-planning .ord-rowlbl{ min-width:54px; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.05em; }
+#view-planning .ord-row{ gap:8px; }
+#view-planning .ord-toolbar select, #view-planning .ord-toolbar .ord-user{ height:32px; border-radius:8px; background:var(--panel-2); }
+#view-planning .ms-btn{ border-radius:999px !important; }
+#view-planning .result-count{ font-family:var(--sans); font-size:12px; color:var(--text-faint); }
+
+/* grid */
+#view-planning #ordersScroll{ background:var(--panel); border:1px solid var(--line); border-radius:12px; }
+#view-planning #ordersTable{ font-size:var(--ord-fs, 12.5px); }
+#view-planning #ordersTable thead th{ background:var(--panel); color:var(--text-faint); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; padding:11px 10px; box-shadow:0 1px 0 var(--line); white-space:nowrap; }
+#view-planning #ordersTable tbody td{ vertical-align:middle; border-left:none !important; border-right:none !important; }
+#view-planning tr.og-line > td{ padding:8px 10px; border-bottom:1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+#view-planning tr.og-line:hover > td:not(.og-merged){ background:color-mix(in srgb, var(--accent) 5%, transparent); }
+#view-planning tr.og-line > td:first-child{ box-shadow:inset 3px 0 0 hsl(var(--ch) var(--cs) 55% / .55); }
+#view-planning .og-oid{ font-family:var(--mono); font-size:11.5px; color:var(--text-dim); cursor:copy; white-space:nowrap; }
+#view-planning .og-oid:hover{ color:var(--accent); }
+#view-planning td.og-merged{ background:transparent; vertical-align:middle; }
+#view-planning .osv-item .osv-sku{ font-family:var(--mono); font-weight:700; font-size:12.5px; color:var(--accent); }
+#view-planning .osv-item .osv-desc{ font-size:11.5px; color:var(--text-dim); max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+#view-planning .osv-item .og-blocksum{ font-family:var(--sans); font-size:10.5px; color:var(--text-faint); margin-top:3px; }
+#view-planning .osv-po{ font-family:var(--mono); font-size:11.5px; color:var(--text-faint); white-space:nowrap; }
+#view-planning .osv-qty{ font-weight:600; }
+#view-planning .osv-faint{ color:var(--text-faint); }
+#view-planning .osv-cust{ display:inline-flex; align-items:center; gap:7px; max-width:190px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); font-size:12px; }
+#view-planning .osv-cust i, #view-planning .osv-gcust i{ width:8px; height:8px; border-radius:50%; flex:none; background:hsl(var(--ch) var(--cs) 55%); }
+#view-planning .osv-ship{ display:inline-flex; flex-direction:column; line-height:1.15; white-space:nowrap; }
+#view-planning .osv-ship b{ font-family:var(--mono); font-weight:500; font-size:11.5px; color:var(--text); }
+#view-planning .osv-ship i{ font-style:normal; font-size:10.5px; color:var(--text-faint); }
+#view-planning .osv-ship.past i{ color:var(--risk-text, var(--risk)); font-weight:600; }
+#view-planning .osv-ship.soon i{ color:var(--prod); font-weight:600; }
+#view-planning .osv-prog{ min-width:150px; }
+#view-planning .osv-pr{ display:flex; align-items:center; gap:6px; height:15px; }
+#view-planning .osv-prl{ width:10px; font-size:10px; font-weight:700; color:var(--text-faint); }
+#view-planning .osv-pr .og-pb{ height:5px; width:92px; border-radius:3px; }
+#view-planning .osv-pr .og-pct{ font-size:10.5px; min-width:30px; }
+#view-planning .pk-tag{ font-size:10.5px; padding:2px 9px; animation:none !important; }
+#view-planning .osv-wo .woc-act{ gap:5px; }
+#view-planning .osv-wo .og-note{ margin-top:4px; }
+#view-planning .soc-add{ border:none; padding:2px 6px; opacity:.55; }
+#view-planning tr.og-line:hover .soc-add{ opacity:1; }
+#view-planning .soc-cell .soc-text{ display:block; max-width:170px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11.5px; }
+#view-planning .skip-btn{ background:transparent; border-color:var(--line); color:var(--text-faint); font-size:10px; padding:1px 8px; opacity:0; transition:opacity .12s; }
+#view-planning tr.og-line:hover .skip-btn, #view-planning .skip-btn.on{ opacity:1; }
+#view-planning .skip-btn.on{ border-color:rgba(240,82,92,.55); color:var(--risk); }
+
+/* group headers */
+#view-planning tr.og-gh > td{ border-top:none !important; }
+#view-planning tr.og-g1 > td{ background:var(--panel-2); background:color-mix(in srgb, var(--panel-2) 85%, var(--panel)); padding:10px 12px; border-bottom:1px solid var(--line); }
+#view-planning tr.og-g1:hover > td{ background:color-mix(in srgb, var(--accent) 7%, var(--panel-2)); }
+#view-planning tr.og-g2 > td, #view-planning tr.og-g3 > td{ background:var(--panel); padding:8px 12px; border-bottom:1px solid color-mix(in srgb, var(--line) 60%, transparent); font-weight:600; }
+#view-planning tr.og-g2:hover > td, #view-planning tr.og-g3:hover > td{ background:color-mix(in srgb, var(--accent) 5%, var(--panel)); }
+#view-planning tr.og-cu-row > td{ box-shadow:inset 3px 0 0 hsl(var(--ch) var(--cs) 55%); }
+#view-planning .og-head{ gap:10px; flex-wrap:nowrap; }
+#view-planning .osv-caret{ width:12px; color:var(--text-faint); font-size:11px; }
+#view-planning .osv-gdate{ font-weight:700; font-size:13px; color:var(--text-hi, var(--text)); white-space:nowrap; }
+#view-planning .osv-urg{ font-size:11px; font-weight:600; padding:2px 9px; border-radius:999px; white-space:nowrap; }
+#view-planning .osv-urg.past{ color:var(--risk-text, var(--risk)); background:rgba(240,82,92,.12); }
+#view-planning .osv-urg.soon{ color:var(--prod); background:rgba(245,185,77,.12); }
+#view-planning .osv-urg.ok{ color:var(--text-dim); background:color-mix(in srgb, var(--text-faint) 14%, transparent); }
+#view-planning .osv-gcust{ display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:12.5px; color:var(--text); }
+#view-planning .osv-gsku{ font-family:var(--mono); font-weight:700; color:var(--accent); }
+#view-planning .osv-sum{ margin-left:auto; display:flex; gap:14px; align-items:center; font-family:var(--sans); font-style:normal; font-size:11.5px; color:var(--text-faint); white-space:nowrap; }
+#view-planning .osv-gp{ display:inline-flex; align-items:center; gap:6px; }
+#view-planning .osv-gpb{ width:54px; height:5px; border-radius:3px; background:var(--line); overflow:hidden; display:inline-block; }
+#view-planning .osv-gpb i{ display:block; height:100%; background:var(--ok); }
+#view-planning .osv-empty{ color:var(--text-faint); text-align:center; padding:36px !important; }
+#view-planning .ord-grip{ margin-top:6px; }
+#view-planning #ordersTable{ width:100%; }
+#view-planning .og-head{ flex-wrap:wrap; row-gap:4px; }
+#view-planning .osv-sum{ white-space:normal; flex-wrap:wrap; justify-content:flex-end; gap:4px 14px; }
+#view-planning .osv-sum > span{ white-space:nowrap; }
+#view-planning td.osv-item{ max-width:280px; }
+#view-planning .osv-item .osv-desc{ max-width:270px; }
+#view-planning .soc-cell .soc-text{ max-width:130px; }
+#view-planning .osv-wo .woc-act.og-compact button{ padding:2px 8px; font-size:10.5px; }
+#view-planning .osv-wo .woc-badge{ font-size:10.5px; padding:2px 8px; }
+#view-planning .create-wo-btn, #view-planning .woc-covered-btn{ animation:none !important; }
 </style>
 </head>
 <body>
@@ -1123,9 +1233,10 @@
   <!-- ================= PLANNING VIEW (open orders by ship cancel -> customer) ================= -->
   <div class="view" id="view-planning">
     <div class="panel" style="margin-bottom:18px;">
-      <div class="panel-title">Open sales orders</div>
-      <div class="panel-desc">Open sales order lines, grouped the way you need (filters, grouping and sort are above) — and whether each item needs a work order. Every filter accepts several choices at once.</div>
-      <div class="panel-desc" style="margin-top:4px;">A SKU <b>needs a work order</b> when its Available (already net of open orders) plus what is left on its open work order(s) is still negative. Click a work order chip to see each work order's status, schedule and progress. The same item can appear on many orders: its orders, order IDs and P.O.s are listed together and its work order status is shown <b>once</b> for all of them. Click a group header to hide / show what is inside it. Click any grey part of a line to open the incoming-goods dropdown for its SKU (containers already packed, ETA, POs, raw material). To add up quantities, select lines — drag over them, Ctrl+click (⌘ on Mac) to pick one by one, Shift+click for a range — and the totals appear next to the cursor (Esc clears). To resize the grid, drag the edge of a column header (double-click resets that column), and use A− / A+ for the text size. By default only what is still to be picked is listed; add <b>Fully Picked</b> in the Picked filter to see those lines too.</div>
+      <div class="osv-top">
+        <div><div class="osv-title">Open sales orders</div><div class="osv-subtitle">What still has to be picked, when it ships and whether each item needs a work order.</div></div>
+        <details class="osv-help"><summary>ⓘ How this page works</summary><div class="osv-help-body"><p>Open sales order lines, grouped the way you need (filters, grouping and sort are above) — and whether each item needs a work order. Every filter accepts several choices at once.</p><p>A SKU <b>needs a work order</b> when its Available (already net of open orders) plus what is left on its open work order(s) is still negative. Click a work order chip to see each work order's status, schedule and progress. The same item can appear on many orders: its orders, order IDs and P.O.s are listed together and its work order status is shown <b>once</b> for all of them. Click a group header to hide / show what is inside it. Click any grey part of a line to open the incoming-goods dropdown for its SKU (containers already packed, ETA, POs, raw material). To add up quantities, select lines — drag over them, Ctrl+click (⌘ on Mac) to pick one by one, Shift+click for a range — and the totals appear next to the cursor (Esc clears). To resize the grid, drag the edge of a column header (double-click resets that column), and use A− / A+ for the text size. By default only what is still to be picked is listed; add <b>Fully Picked</b> in the Picked filter to see those lines too.</p></div></details>
+      </div>
       <div class="ord-stats" id="ordStats"></div>
       <div class="ord-toolbar">
         <div class="ord-row">
@@ -2498,23 +2609,32 @@ function renderOrdersView(){
   // ----- structure: which columns exist depends on how the list is grouped -----
   const fields = ordState.groups.filter((f,i,a)=>ORD_FIELD_LABEL[f] && a.indexOf(f) === i);
   const bySku = fields.includes('sku');
-  const cols = { order:true, sku:!bySku, desc:!bySku, customer:!fields.includes('customer'), po:true, ship:!fields.includes('ship'), qty:true, picked:true, staged:true, avail:true, status:!fields.includes('picked'), wo:!bySku, comments:true, skip:true };
-  const heads = [['order','Order ID'],['sku','SKU'],['desc','Description'],['customer','Customer'],['po','P.O'],['ship','Ship cancel'],['qty','Qty ordered','num'],['picked','Qty picked'],['staged','Qty staged'],['avail','Available','num'],['status','Picked'],['wo','Work order'],['comments','Comments'],['skip','Action']].filter(h=>cols[h[0]]);
+  const cols = { order:true, item:!bySku, customer:!fields.includes('customer'), po:true, ship:!fields.includes('ship'), qty:true, progress:true, avail:true, status:!fields.includes('picked'), wo:!bySku, comments:true, skip:true };
+  const heads = [['order','Order'],['item','Item'],['customer','Customer'],['po','P.O'],['ship','Ship cancel'],['qty','Ordered','num'],['progress','Picked · Staged'],['avail','Available','num'],['status','Status'],['wo','Work order'],['comments','Notes'],['skip','']].filter(h=>cols[h[0]]);
   document.getElementById('ordersHeadRow').innerHTML = heads.map(h=>`<th class="${h[2]||''}" data-col="${h[0]}">${h[1]}<span class="col-rs" data-col="${h[0]}"></span></th>`).join('');
   ordApplyLayout(heads);
   const ncols = heads.length, maxDepth = fields.length;
-  let blkN = 0;                      // block ids: the lines of one SKU block share one, so the dropdown can open under the whole block
-  const seen = new Set();            // Create / Covered buttons only once per SKU (on the first one that is on screen)
+  let blkN = 0;
+  const seen = new Set();
   const closedBy = (depth, path) => ((ordState.level === 'top') ? true : (ordState.level === 'headers' ? depth === maxDepth : false)) !== ordToggled.has(path);
 
-  const pbCell = (l, k) => { const v = Math.min(l[k] || 0, l.qty), q = l.qty || 1; return `<td class="og-pbtd"><div class="og-pbw"><div class="og-pb ${k}" data-k="${k}" data-v="${v}" data-q="${l.qty}"><i style="width:${Math.min(100, v / q * 100)}%"></i></div><span class="og-pct">${Math.round(v / q * 100)}%</span></div></td>`; };
+  const pct = (v, q) => q > 0 ? Math.round(Math.min(v, q) / q * 100) : 0;
+  const pbRow = (l, k, lbl) => { const v = Math.min(l[k] || 0, l.qty), p = pct(v, l.qty || 1); return `<div class="osv-pr"><span class="osv-prl">${lbl}</span><div class="og-pb ${k}" data-k="${k}" data-v="${v}" data-q="${l.qty}"><i style="width:${p}%"></i></div><span class="og-pct">${p}%</span></div>`; };
+  const progCell = l => `<td class="og-pbtd osv-prog">${pbRow(l,'picked','P')}${pbRow(l,'staged','S')}</td>`;
+  const shipCell = d => {
+    if(!d) return '<span class="osv-faint">—</span>';
+    const days = shipDays(d), cls = days < 0 ? 'past' : (days < 14 ? 'soon' : 'ok');
+    const rel = days < 0 ? `${-days}d late` : (days === 0 ? 'today' : `in ${days}d`);
+    return `<span class="osv-ship ${cls}"><b>${esc(fmtShip(d))}</b><i>${rel}</i></span>`;
+  };
+  const custCell = name => `<span class="osv-cust" style="${custVars(name)}"><i></i>${esc(name)}</span>`;
+  const itemCell = (sku, desc, rs, extra) => `<td${rs} class="og-merged osv-item"><div class="sku-code osv-sku">${esc(sku)}</div><div class="osv-desc" title="${esc(desc)}">${esc(desc)}</div>${extra || ''}</td>`;
   const leafLine = (l, ind, merged, blk) => `<tr class="og-line og-cu${l.done ? ' og-done' : ''}${l.skip ? ' og-skip' : ''}${merged && merged.first ? ' og-block-start' : ''}" style="${custVars(l.customer)}" data-k="${esc(lineKey(l))}" data-sku="${esc(l.sku)}" data-order="${esc(l.order_id)}" data-status="${l.status}" data-blk="${blk}">
       <td class="og-oid" data-oid="${esc(l.order_id)}" title="Click: copy order ID · Double-click: open in SellerCloud" style="padding-left:${ind}px">${esc(l.order_id)}</td>${merged ? merged.cells : ''}
-      ${cols.customer ? `<td class="og-cust-cell">${custChip(l.customer)}</td>` : ''}<td>${esc(l.po)}</td>${cols.ship ? `<td>${shipCancelHtml(l.ship)}</td>` : ''}
-      <td class="num">${fmt(l.qty)}</td>${pbCell(l,'picked')}${pbCell(l,'staged')}<td class="num${l.avail != null && l.avail < 0 ? ' og-neg' : ''}">${l.avail == null ? '—' : fmt(l.avail)}</td>${cols.status ? `<td class="og-status">${pkTag(l.status)}</td>` : ''}${merged && merged.wo ? merged.wo : ''}<td class="soc-td">${commentCell(l)}</td><td class="og-act-td">${skipBtn(l)}</td></tr>`;
-  // Leaf level. Not grouped by SKU: every SKU becomes one block — its SKU, description and work order status are shown ONCE (merged cells) next to all of its orders.
+      ${cols.customer ? `<td class="og-cust-cell">${custCell(l.customer)}</td>` : ''}<td class="osv-po">${esc(l.po)}</td>${cols.ship ? `<td>${shipCell(l.ship)}</td>` : ''}
+      <td class="num osv-qty">${fmt(l.qty)}</td>${progCell(l)}<td class="num${l.avail != null && l.avail < 0 ? ' og-neg' : ''}">${l.avail == null ? '<span class="osv-faint">—</span>' : fmt(l.avail)}</td>${cols.status ? `<td class="og-status">${pkTag(l.status)}</td>` : ''}${merged && merged.wo ? merged.wo : ''}<td class="soc-td">${commentCell(l)}</td><td class="og-act-td">${skipBtn(l)}</td></tr>`;
   const renderLeaf = (ls, depth) => {
-    const ind = 14 + 16 * depth;
+    const ind = 12 + 14 * Math.max(0, depth - 1);
     if(bySku) return sortLines(ls).map(l=>leafLine(l, ind, null, 'b' + (++blkN))).join('');
     const bm = new Map();
     ls.forEach(l=>{ if(!bm.has(l.sku)) bm.set(l.sku, []); bm.get(l.sku).push(l); });
@@ -2524,38 +2644,45 @@ function renderOrdersView(){
       const first = !seen.has(b.key); seen.add(b.key);
       const allDone = b.lines.every(l=>l.done);
       const woHtml = allDone ? pkTag('full') : orderWoCell(b.key, skuNeed(b.key), first, 'compact');
-      const cells = (cols.sku ? `<td${rs} class="sku-code og-merged">${esc(b.key)}</td>` : '')
-        + (cols.desc ? `<td${rs} class="desc-cell og-merged" title="${esc(b.lines[0].desc)}">${esc(b.lines[0].desc)}${n > 1 ? `<div class="og-blocksum">${n} orders · ordered ${fmt(b.agg.qty)} · picked ${fmt(b.agg.picked)}</div>` : ''}</td>` : '');
-      const wo = cols.wo ? `<td${rs} class="og-merged">${woHtml}${n > 1 && !allDone ? `<div class="og-note">Applies to all ${n} orders of this SKU</div>` : ''}</td>` : '';
+      const cells = cols.item ? itemCell(b.key, b.lines[0].desc, rs, n > 1 ? `<div class="og-blocksum">${n} orders · ${fmt(b.agg.qty)} ordered · ${pct(b.agg.picked, b.agg.qty)}% picked</div>` : '') : '';
+      const wo = cols.wo ? `<td${rs} class="og-merged osv-wo">${woHtml}${n > 1 && !allDone ? `<div class="og-note">for all ${n} orders</div>` : ''}</td>` : '';
       const bid = 'b' + (++blkN);
       return sorted.map((l,i)=>leafLine(l, ind, i === 0 ? { first:true, cells, wo } : null, bid)).join('');
     }).join('');
   };
   const summary = (node) => {
     const a = node.agg, parts = [];
-    if(node.field !== 'customer') parts.push(`${a.customers} customer${a.customers===1?'':'s'}`);
-    if(node.field !== 'sku') parts.push(`${a.skus} SKU${a.skus===1?'':'s'}`);
-    parts.push(`${a.n} line${a.n===1?'':'s'}`, `ordered ${fmt(a.qty)}`, `picked ${fmt(a.picked)}`);
-    return parts.join(' · ');
+    if(node.field !== 'customer' && a.customers > 1) parts.push(`<span>${a.customers} customers</span>`);
+    if(node.field !== 'sku') parts.push(`<span>${a.skus} SKU${a.skus===1?'':'s'}</span>`);
+    parts.push(`<span>${a.n} line${a.n===1?'':'s'}</span>`, `<span>${fmt(a.qty)} ordered</span>`);
+    const p = pct(a.picked, a.qty);
+    parts.push(`<span class="osv-gp"><span class="osv-gpb"><i style="width:${p}%"></i></span>${p}% picked</span>`);
+    return parts.join('');
   };
   const headerHtml = (node, depth, closed, path) => {
     let label;
     switch(node.field){
-      case 'ship': label = node.key ? `${shipCancelHtml(node.key)}<span class="og-when">${shipWhenText(node.key)}</span>` : '<b>No ship cancel date</b>'; break;
+      case 'ship': {
+        if(!node.key){ label = '<span class="osv-gdate">No ship cancel date</span>'; break; }
+        const days = shipDays(node.key), cls = days < 0 ? 'past' : (days < 14 ? 'soon' : 'ok');
+        const rel = days < 0 ? `${-days} day${days===-1?'':'s'} overdue` : (days === 0 ? 'due today' : `due in ${days} day${days===1?'':'s'}`);
+        const dt = new Date(node.key + 'T12:00:00');
+        label = `<span class="osv-gdate">${dt.toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric', year:'numeric'})}</span><span class="osv-urg ${cls}">${rel}</span>`;
+        break; }
       case 'sku': {
         const sku = node.key, d = BY_SKU[sku], desc = d ? d.Description : (node.lines[0].desc || '');
         const first = !seen.has(sku); seen.add(sku);
         const woHtml = node.lines.every(l=>l.done) ? pkTag('full') : orderWoCell(sku, skuNeed(sku), first, 'inline');
-        label = `<span class="sku-code">${esc(sku)}</span><span class="og-desc">${esc(desc)}</span>${woHtml}`;
+        label = `<span class="sku-code osv-gsku">${esc(sku)}</span><span class="og-desc">${esc(desc)}</span>${woHtml}`;
         break; }
-      case 'order': label = `<b>Order ${esc(node.key)}</b><span class="og-when">${custChip(node.lines[0].customer)}</span>`; break;
-      case 'po': label = `<b>P.O ${esc(node.key)}</b>`; break;
+      case 'order': label = `<span class="osv-gdate">Order ${esc(node.key)}</span>${custCell(node.lines[0].customer)}`; break;
+      case 'po': label = `<span class="osv-gdate">P.O ${esc(node.key)}</span>`; break;
       case 'picked': label = pkTag(node.key); break;
       case 'wo': label = `<span class="woc-badge ${node.key==='needs' ? 'short' : ((node.key==='has' || node.key==='marked' || node.key==='ok') ? 'covered' : 'none')}">${WO_KEY_LABEL[node.key]}</span>`; break;
-      case 'customer': label = custChip(node.key); break;
-      default: label = `<b>${esc(node.key)}</b>`;
+      case 'customer': label = `<span class="osv-gcust" style="${custVars(node.key)}"><i></i>${esc(node.key)}</span>`; break;
+      default: label = `<span class="osv-gdate">${esc(node.key)}</span>`;
     }
-    return `<tr class="og-gh og-g${Math.min(depth,3)}${closed ? ' og-closed' : ''}${node.field === 'customer' ? ' og-cu-row' : ''}"${node.field === 'customer' ? ` style="${custVars(node.key)}"` : ''} data-key="${esc(path)}"><td colspan="${ncols}" style="padding-left:${12 + 16*(depth-1)}px"><div class="og-head">${label}<span class="og-sum">${summary(node)}${closed ? ' · hidden' : ''}</span></div></td></tr>`;
+    return `<tr class="og-gh og-g${Math.min(depth,3)}${closed ? ' og-closed' : ''}${node.field === 'customer' ? ' og-cu-row' : ''}"${node.field === 'customer' ? ` style="${custVars(node.key)}"` : ''} data-key="${esc(path)}"><td colspan="${ncols}" style="padding-left:${10 + 14*(depth-1)}px"><div class="og-head"><span class="osv-caret">${closed ? '▸' : '▾'}</span>${label}<span class="og-sum osv-sum">${summary(node)}</span></div></td></tr>`;
   };
   const renderNodes = (nodes, depth, parentPath) => {
     let out = '';
@@ -2569,11 +2696,23 @@ function renderOrdersView(){
     return out;
   };
   const tree = buildNodes(lines, fields);
-  body.innerHTML = (tree ? renderNodes(tree, 1, '') : renderLeaf(lines, 0)) || `<tr><td colspan="${ncols}" style="color:var(--text-faint); text-align:center; padding:24px;">No orders match</td></tr>`;
+  body.innerHTML = (tree ? renderNodes(tree, 1, '') : renderLeaf(lines, 0)) || `<tr><td colspan="${ncols}" class="osv-empty">No orders match these filters</td></tr>`;
 
-  const customers = new Set(lines.map(l=>l.customer)), needSkus = new Set(lines.filter(l=>!l.done && skuNeed(l.sku).state === 'needs').map(l=>l.sku));
-  document.getElementById('ordStats').innerHTML = [[lines.length,'Order lines','var(--text)'],[new Set(lines.map(l=>l.ship).filter(Boolean)).size,'Ship cancel dates','var(--text)'],[customers.size,'Customers','var(--text)'],[new Set(lines.map(l=>l.sku)).size,'SKUs','var(--text)'],[needSkus.size,'SKUs need a work order','var(--risk)']]
-    .map(([v,l,c])=>`<div class="ord-stat"><span class="val" style="color:${c};">${fmt(v)}</span><span class="lbl">${l}</span></div>`).join('');
+  // ----- KPI cards (the three coloured ones are shortcuts: click to filter, click again to clear) -----
+  const open = lines.filter(l=>!l.done);
+  const toPick = open.reduce((s,l)=>s + Math.max(0, l.qty - l.picked), 0);
+  const overdue = open.filter(l=>l.ship && shipDays(l.ship) < 0), soon = open.filter(l=>l.ship && shipDays(l.ship) >= 0 && shipDays(l.ship) < 14);
+  const needSkus = new Set(open.filter(l=>skuNeed(l.sku).state === 'needs').map(l=>l.sku));
+  const customers = new Set(lines.map(l=>l.customer));
+  const on = (k, v) => ordState.f[k].size === 1 && ordState.f[k].has(v);
+  const card = (v, lbl, sub, cls, kpi, active) => `<div class="osv-kpi ${cls}${kpi ? ' osv-click' : ''}${active ? ' on' : ''}"${kpi ? ` data-osv-kpi="${kpi}" title="${active ? 'Click to clear this filter' : 'Click to show only these lines'}"` : ''}><span class="v">${v}</span><span class="l">${lbl}</span><span class="s">${sub}</span></div>`;
+  document.getElementById('ordStats').innerHTML =
+    card(fmt(lines.length), 'Order lines', `${fmt(new Set(lines.map(l=>l.order_id)).size)} orders`, '', '', false) +
+    card(fmt(toPick), 'Units to pick', `${fmt(new Set(open.map(l=>l.sku)).size)} SKUs`, '', '', false) +
+    card(fmt(overdue.length), 'Overdue lines', `${fmt(overdue.reduce((s,l)=>s + Math.max(0, l.qty - l.picked), 0))} units late`, 'red', 'overdue', on('ship','overdue')) +
+    card(fmt(soon.length), 'Due in < 2 weeks', `${fmt(new Set(soon.map(l=>l.order_id)).size)} orders`, 'amber', 'soon', on('ship','soon')) +
+    card(fmt(needSkus.size), 'SKUs need a WO', 'short after open WOs', 'red', 'needs', on('wo','needs')) +
+    card(fmt(customers.size), 'Customers', `${fmt(new Set(lines.map(l=>l.ship).filter(Boolean)).size)} ship dates`, '', '', false);
   document.getElementById('ordResultCount').textContent = `${fmt(lines.length)} line${lines.length===1?'':'s'}` + (lines.some(l=>l.skip) ? ` · ${fmt(lines.filter(l=>l.skip).length)} skipped` : '') + (hiddenSkus.size ? ` · ${fmt(hiddenSkus.size)} dismissed SKU${hiddenSkus.size===1?'':'s'} hidden` : '');
   msRefresh(facets);
   selPaint();                              // keep / prune the row selection after every render
@@ -2581,6 +2720,13 @@ function renderOrdersView(){
   ordSyncG1H(); ordUpdateStickyG2(true);
 }
 
+document.getElementById('ordStats').addEventListener('click', e=>{
+  const c = e.target.closest('[data-osv-kpi]'); if(!c) return;
+  const k = c.dataset.osvKpi, key = k === 'needs' ? 'wo' : 'ship';
+  const isOn = ordState.f[key].size === 1 && ordState.f[key].has(k);
+  ordState.f[key] = isOn ? new Set(ORD_DEFAULTS[key]) : new Set([k]);
+  renderOrdersView();
+});
 // ----- controls: multi-select dropdowns for the filters and for the grouping -----
 const GROUP_FIELDS = Object.keys(ORD_FIELD_LABEL);
 const msSearch = {};                      // text typed in a dropdown's own search box (customer, category)
@@ -2758,7 +2904,7 @@ document.getElementById('ordersBody').addEventListener('click', e=>{
 })();
 
 // ---------- Grid size: column widths (drag the header edges), grid height (drag the bar under it), text size ----------
-const ORD_DEFAULT_W = { order:100, sku:354, desc:230, customer:170, po:111, ship:111, qty:105, picked:150, staged:150, avail:97, status:114, wo:240, comments:170, skip:69 };   // what the automatic layout gives
+const ORD_DEFAULT_W = { order:100, item:300, progress:170, sku:354, desc:230, customer:170, po:111, ship:111, qty:105, picked:150, staged:150, avail:97, status:114, wo:240, comments:170, skip:69 };   // what the automatic layout gives
 const ORD_MIN_W = 48, ORD_FS_MIN = 10, ORD_FS_MAX = 16, ORD_FS_DEFAULT = 12;
 let ordLayout = { widths:null, height:null, fs:ORD_FS_DEFAULT };          // widths: null = automatic (the original look) | { column: px }
 let ordHeads = [];
